@@ -1,6 +1,8 @@
 const { formatShort } = require('./transform_timestamp');
+const SqliteDB = require('../../../src/db/db');
+const dbService = new SqliteDB('./candles.db');
 
-async function findMinima(candles) {
+async function findMinima(candles, symbol) {
     if (!candles || candles.length < 30) {
         return [];
     }
@@ -16,21 +18,27 @@ async function findMinima(candles) {
     }
 
     const results = [];
-    const currentPrice = candles[0][4]; // Последняя свеча (рекомендуется)
+    const currentPriceData = await dbService.getLastMinutePrices(symbol);
+
+    if(currentPriceData <= 0){
+        return;
+    };
+    const currentPrice = currentPriceData[0].lastPrice;
+    console.log('CURRENT PRICE FOR MINIMA', currentPrice, candles[candles.length - 1].datetime);
     
-    const windowSize = 10;
+    const windowSize = 5;
     
     // Step 2: Находим лучший минимум в каждой части
     for (let partIndex = 0; partIndex < parts.length; partIndex++) {
         const part = parts[partIndex];
         let bestCandle = null;
-        let bestPrice = Infinity; // Для минимумов начинаем с Infinity
+        let bestPrice = Infinity;
 
         for (let i = 0; i < part.length; i++) {
             const candle = part[i];
-            const close = candle[4];
+            const low = candle.low;                    // ← Лучше использовать low
 
-            if (close > currentPrice) continue;
+            if (low > currentPrice) continue;
 
             // Проверка локального минимума
             let isLocalMin = true;
@@ -39,38 +47,48 @@ async function findMinima(candles) {
 
             for (let j = left; j <= right; j++) {
                 if (j === i) continue;
-                if (part[j][4] <= close) {        // ≤ — важный момент для минимумов
+                if (part[j].low <= low) {              // ← Используем low
                     isLocalMin = false;
                     break;
                 }
             }
 
-            if (isLocalMin && close < bestPrice) {
-                bestPrice = close;
+            if (isLocalMin && low < bestPrice) {
+                bestPrice = low;
                 bestCandle = candle;
             }
         }
 
         if (bestCandle) {
             results.push({
-                closePrice: bestCandle[4],
-                dateTime: formatShort(bestCandle[0]),
-                timestamp: bestCandle[0]
+                closePrice: bestCandle.close,
+                lowPrice: bestCandle.low,              // ← Добавил для удобства
+                dateTime: formatShort(bestCandle.timestamp),
+                timestamp: bestCandle.timestamp
             });
         }
     }
 
-    // === НОВЫЙ ЭТАП: Фильтрация ===
     if (results.length === 0) return [];
 
-    // Находим самый первый (самый левый) минимум
-    const firstMin = results[0].closePrice;
 
-    // Оставляем только те минимумы, которые <= первого минимума
-    const filteredResults = results.filter(item => item.closePrice <= firstMin);
+    // === ПОСЛЕДОВАТЕЛЬНАЯ ФИЛЬТРАЦИЯ ПО УБЫВАНИЮ ===
+    const filteredResults = [];
+    
+    // Первый минимум всегда оставляем
+    filteredResults.push(results[results.length - 1]);
 
-    console.log('Все найденные минимумы:', results);
-    console.log('После фильтрации (ниже первого):', filteredResults);
+    for (let i = results.length - 2; i >= 0; i--) {
+        const prevMin = filteredResults[filteredResults.length - 1].lowPrice || 
+                       filteredResults[filteredResults.length - 1].closePrice;
+        
+        const currentMin = results[i].lowPrice || results[i].closePrice;
+
+        if (currentMin < prevMin) {        // строго ниже предыдущего оставленного
+            filteredResults.push(results[i]);
+        }
+        // если выше или равен — пропускаем
+    }
 
     return filteredResults;
 }

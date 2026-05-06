@@ -4,7 +4,7 @@ const dbService = new SqliteDB('./candles.db');
 const bybitClient = new BybitClient();
 
 async function updateHistoryData(symbol, interval) {
-    const ohlcData = await bybitClient.getCandles(symbol, interval, 200);
+    const ohlcData = await bybitClient.getCandles(symbol, interval, 300);
     await dbService.saveCandles(symbol, interval, ohlcData);
     return;
 }

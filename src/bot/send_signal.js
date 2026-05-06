@@ -13,7 +13,7 @@ const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
  * @param {string} interval - Таймфрейм (например: 1h, 4h, 1d)
  * @returns {Promise<object>} - Объект с результатом отправки сообщения
  */
- async function sendSignal(symbol, interval, signalType) {
+ async function sendSignal(symbol, interval, signalType, dataTime) {
     try {
 
         // Формируем текст сообщения с информацией об оповещении
@@ -23,6 +23,7 @@ const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
 📊 Инструмент: *${symbol}*
 ⏱️ Таймфрейм: *${interval}*
 🔔 Сигнал: *${signalType}*
+⏱️ - *${dataTime}*
 
 *Анализ показывает потенциальное движение вверх по этому инструменту.*
         `.trim();

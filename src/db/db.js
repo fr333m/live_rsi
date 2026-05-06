@@ -70,6 +70,122 @@ class SqliteDB {
         console.error('Error creating all_contracts_tracking table:', err.message);
       }
     });
+
+    const createFilteredMinimumTable = `
+      CREATE TABLE IF NOT EXISTS filteredMinimum (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          symbol TEXT NOT NULL,
+          timestamp INTEGER NOT NULL,
+          datetime DATETIME NOT NULL,
+          price REAL NOT NULL,
+          interval TEXT NOT NULL
+      );
+    `;
+    this.db.run(createFilteredMinimumTable, (err) => {
+      if (err) {
+        console.error('Error creating filteredMinimum table:', err.message);
+      }
+    });
+
+    const createTableForControlSendSignal = `
+      CREATE TABLE IF NOT EXISTS control_send_signal (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          symbol TEXT NOT NULL,
+          timestamp INTEGER NOT NULL,
+          interval TEXT NOT NULL,
+          type_signal TEXT NOT NULL
+      );
+    `;
+    this.db.run(createTableForControlSendSignal, (err) => {
+      if (err) {
+        console.error('Error creating control_send_signal table:', err.message);
+      }
+    });
+  }
+
+
+ async saveSendSignalControl(symbol, timestamp, interval, typeSignal) {
+
+    return new Promise((resolve, reject) => {
+      this.db.serialize(() => {
+        this.db.run('BEGIN TRANSACTION');
+        const stmt = this.db.prepare(`
+          INSERT OR IGNORE INTO control_send_signal 
+          (symbol, timestamp, interval, type_signal) 
+          VALUES (?, ?, ?, ?)
+        `);
+
+        stmt.run(
+          symbol,
+          timestamp,
+          interval,
+          typeSignal,
+          (err) => {
+            if (err) {
+              console.error('Error inserting control send signal:', err.message);
+              reject(err);
+            }
+          }
+        );
+
+        stmt.finalize();
+        this.db.run('COMMIT', (err) => {
+          if (err) {
+            console.error('Error committing transaction:', err.message);
+            reject(err);
+          } else {
+            console.log('Control send signal saved successfully.');
+            resolve();
+          }
+        });
+      });
+    });
+ } 
+
+  /**
+   * Save filtered minimum data to the filteredMinimum table.
+   * @param {string} symbol - Symbol name, e.g., 'BTCUSDT'
+   * @param {string} interval - Kline interval, e.g., '1m'
+   * @param {Array<Object>} minima - Array of minimum data points
+   * @returns {Promise<void>}
+   */
+  async saveFilteredMinimum(symbol, interval, minima) {
+    return new Promise((resolve, reject) => {
+      this.db.serialize(() => {
+        this.db.run('BEGIN TRANSACTION');
+        const stmt = this.db.prepare(`
+          INSERT OR IGNORE INTO filteredMinimum 
+          (symbol, timestamp, price, interval, datetime) 
+          VALUES (?, ?, ?, ?, ?)
+        `);
+
+        for (const min of minima) {
+          stmt.run(
+            symbol,
+            min.timestamp,
+            min.closePrice,
+            interval,
+            min.dateTime,
+            (err) => {
+              if (err) {
+                console.error('Error inserting filtered minimum:', err.message);
+              }
+            }
+          );
+        }
+
+        stmt.finalize();
+        this.db.run('COMMIT', (err) => {
+          if (err) {
+            console.error('Error committing transaction:', err.message);
+            reject(err);
+          } else {
+            console.log('Filtered minimum data saved successfully.');
+            resolve();
+          }
+        });
+      });
+    });
   }
 
   /**
@@ -223,29 +339,38 @@ class SqliteDB {
   }
 
 
-  /**
-   * Retrieve all candles from the specified table for a given symbol and interval.
+/**
+   * Retrieve candles from the specified table.
    * @param {string} symbol - Symbol name, e.g., 'BTCUSDT'
    * @param {string} interval - Kline interval, e.g., '1m'
-   * @param {string} table - Table name, e.g., 'candles' or 'filteredMinimum'
-   * @returns {Promise<Array<Array<number>>>} Array of candles: [[timestamp, open, high, low, close, volume], ...] sorted ascending
+   * @param {string} table - Table name
+   * @param {number|null} limit - How many last candles to return (null = all candles)
+   * @returns {Promise<Array<Object>>} Candles sorted by timestamp ASC (oldest → newest)
    */
-async getCandles(symbol, interval, table) {
+async getCandles(symbol, interval, table, limit = null) {
   return new Promise((resolve, reject) => {
-    const query = `
+    let query = `
       SELECT timestamp, datetime, open, high, low, close
       FROM ${table}
       WHERE symbol = ? AND interval = ?
-      ORDER BY timestamp ASC
     `;
 
-    this.db.all(query, [symbol, interval], (err, rows) => {
+    const params = [symbol, interval];
+
+    // Если указан лимит — берём последние N свечей
+    if (limit !== null && limit > 0) {
+      query += ` ORDER BY timestamp DESC LIMIT ?`;
+      params.push(limit);
+    } else {
+      query += ` ORDER BY timestamp ASC`;
+    }
+
+    this.db.all(query, params, (err, rows) => {
       if (err) {
         console.error('Error fetching candles:', err.message);
         reject(err);
       } else {
-        // Возвращаем массив объектов, а не массив массивов
-        const candles = rows.map(row => ({
+        let candles = rows.map(row => ({
           timestamp: row.timestamp,
           datetime: row.datetime,
           open: row.open,
@@ -253,6 +378,12 @@ async getCandles(symbol, interval, table) {
           low: row.low,
           close: row.close,
         }));
+
+        // Если мы делали DESC + LIMIT, то разворачиваем массив,
+        // чтобы вернуть в хронологическом порядке (ASC)
+        if (limit !== null && limit > 0) {
+          candles = candles.reverse();
+        }
 
         resolve(candles);
       }
@@ -657,6 +788,29 @@ async countRecords(tableName, symbol, interval) {
 
       const query = `SELECT * FROM ${tableName} WHERE symbol = ? AND interval = ? ORDER BY timestamp DESC LIMIT 1`;
       const params = [symbol, interval];
+
+      this.db.get(query, params, (err, row) => {
+        if (err) {
+          console.error(`Error fetching latest row from ${tableName}:`, err.message);
+          reject(err);
+        } else {
+          resolve(row || null);
+        }
+      });
+    });
+  }
+
+  async checkRowForTypeSignal(symbol, interval, typeSignal, tableName) {
+    return new Promise((resolve, reject) => {
+      // Basic validation to avoid SQL injection via table name
+      if (!/^[A-Za-z0-9_]+$/.test(tableName)) {
+        const err = new Error('Invalid table name');
+        console.error(err.message);
+        return reject(err);
+      }
+
+      const query = `SELECT * FROM ${tableName} WHERE symbol = ? AND interval = ? AND type_signal = ? ORDER BY timestamp DESC LIMIT 1`;
+      const params = [symbol, interval, typeSignal];
 
       this.db.get(query, params, (err, row) => {
         if (err) {

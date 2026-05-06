@@ -8,6 +8,7 @@ const cleanTableContracts = async (ctx) => {
 
         // Динамический импорт для избежания циклической зависимости
         await dbService.removeDataTable('all_contracts_tracking');
+        await dbService.removeDataTable('control_send_signal');
         await dbService.removeDataTable('trackingContracts');
         await dbService.removeDataTable('live_prices');
         await priceTracker.reload();
