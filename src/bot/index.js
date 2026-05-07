@@ -2,7 +2,7 @@ const { addContracts, handleAddContractsMessage, handleSymbolCallback, handleInt
 const {cleanTableContracts} = require('./clean_table_contracts');
 const { runScript } = require('./run_script');
 
-// const { showTrackingContracts } = require('./showTrackingContracts');
+// const { showtracking_contracts } = require('./showtracking_contracts');
 
 const registerCommands = (bot) => {
   bot.command('add', addContracts);

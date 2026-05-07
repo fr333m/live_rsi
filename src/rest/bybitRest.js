@@ -98,7 +98,7 @@ class BybitClient {
       if (!response.result.list || response.result.list.length === 0) {
         throw new Error('No data found for symbol');
       }
-      return response.result.list[0].lastPrice;
+      return response.result.list[0].lastprice;
     } catch (error) {
       console.error('Error fetching price:', error);
       throw error;

@@ -1,5 +1,5 @@
-const SQLiteDB = require('../db/db');
-const dbService = new SQLiteDB('./candles.db');
+const PostgresDB = require('../db/db');
+const dbService = new PostgresDB();
 const { priceTracker } = require('../ws/wsClient');
 
 const cleanTableContracts = async (ctx) => {
@@ -9,7 +9,7 @@ const cleanTableContracts = async (ctx) => {
         // Динамический импорт для избежания циклической зависимости
         await dbService.removeDataTable('all_contracts_tracking');
         await dbService.removeDataTable('control_send_signal');
-        await dbService.removeDataTable('trackingContracts');
+        await dbService.removeDataTable('tracking_contracts');
         await dbService.removeDataTable('live_prices');
         await priceTracker.reload();
         await ctx.reply(`✅ Таблица all_contracts_tracking успешно очищена!`);

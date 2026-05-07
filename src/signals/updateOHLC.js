@@ -1,5 +1,5 @@
-const SqliteDB = require('../db/db');
-const dbService = new SqliteDB('./candles.db');
+const PostgresDB = require('../db/db');
+const dbService = new PostgresDB();
 
 async function updateOHLC(symbol, interval) {
     const ohlcArr = [];
@@ -7,10 +7,10 @@ async function updateOHLC(symbol, interval) {
 
     console.log(ohlcData[ohlcData.length - 1]);
 
-    const open = ohlcData[ohlcData.length - 1].lastPrice;
-    const close = ohlcData[0].lastPrice;
-    const high = Math.max(...ohlcData.map(item => item.lastPrice));
-    const low = Math.min(...ohlcData.map(item => item.lastPrice));
+    const open = ohlcData[ohlcData.length - 1].lastprice;
+    const close = ohlcData[0].lastprice;
+    const high = Math.max(...ohlcData.map(item => item.lastprice));
+    const low = Math.min(...ohlcData.map(item => item.lastprice));
     const timestamp = ohlcData[ohlcData.length - 1].timestamp;
     ohlcArr.push([timestamp, open, high, low, close]);
     

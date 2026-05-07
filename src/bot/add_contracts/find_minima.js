@@ -1,6 +1,7 @@
 const { formatShort } = require('./transform_timestamp');
-const SqliteDB = require('../../../src/db/db');
-const dbService = new SqliteDB('./candles.db');
+const PostgresDB = require('../../../src/db/db');
+const dbService = new PostgresDB();
+const {getRsi} = require('../../signals/rsi/rsi_value');
 
 async function findMinima(candles, symbol) {
     if (!candles || candles.length < 30) {
@@ -23,16 +24,17 @@ async function findMinima(candles, symbol) {
     if(currentPriceData <= 0){
         return;
     };
-    const currentPrice = currentPriceData[0].lastPrice;
+    const currentPrice = currentPriceData[0].lastprice;
     console.log('CURRENT PRICE FOR MINIMA', currentPrice, candles[candles.length - 1].datetime);
     
-    const windowSize = 5;
+    const windowSize = 10;
     
     // Step 2: Находим лучший минимум в каждой части
     for (let partIndex = 0; partIndex < parts.length; partIndex++) {
         const part = parts[partIndex];
         let bestCandle = null;
         let bestPrice = Infinity;
+
 
         for (let i = 0; i < part.length; i++) {
             const candle = part[i];

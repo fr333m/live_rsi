@@ -1,7 +1,12 @@
-const SqliteDB = require('../../src/db/db');
-const dbService = new SqliteDB('./candles.db');
+const PostgresDB = require('../../src/db/db');
+const dbService = new PostgresDB();
 
-async function checkActualSignal(symbol, interval, timestamp, typeSignal) {
+async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelTimeStamp) {
+    console.log('LEVEL TIMESTAMPPPPPPPPPPPPPPPPPPPPPPP', levelTimeStamp);
+    if(levelTimeStamp === null){
+        return;
+    }
+
     // Валидация параметров
     if (!symbol?.trim() || !interval?.trim()) {
         throw new Error('symbol and interval are required');
@@ -16,14 +21,14 @@ async function checkActualSignal(symbol, interval, timestamp, typeSignal) {
         throw new Error('timestamp must be a positive number (milliseconds)');
     }
 
-    const SIGNAL_INTERVAL = 300000; // 5 минут
+    const SIGNAL_INTERVAL = 600000; // 10 минут
 
     try {
         // Важно: теперь ключ включает typeSignal
-        const existing = await dbService.checkRowForTypeSignal(symbol, interval, typeSignal, 'control_send_signal');
+        const existing = await dbService.checkRowForTypeSignal(symbol, interval, typeSignal, 'control_send_signal', levelTimeStamp);
         
         if (!existing) {
-            await dbService.saveSendSignalControl(symbol, normalizedTimestamp, interval, typeSignal);
+            await dbService.saveSendSignalControl(symbol, normalizedTimestamp, interval, typeSignal, levelTimeStamp);
             console.log(`[Signal Control] ✅ New signal allowed: ${symbol} ${interval} ${typeSignal}`);
             return true;
         }
@@ -38,7 +43,7 @@ async function checkActualSignal(symbol, interval, timestamp, typeSignal) {
 
         // Прошло достаточно времени — обновляем таймер
         await dbService.removeRowOnSymbol(symbol, 'control_send_signal', existing.id);
-        await dbService.saveSendSignalControl(symbol, normalizedTimestamp, interval, typeSignal);
+        await dbService.saveSendSignalControl(symbol, normalizedTimestamp, interval, typeSignal, levelTimeStamp);
 
         console.log(`[Signal Control] ✅ Signal allowed after cooldown: ${symbol} ${interval} ${typeSignal}`);
         return true;

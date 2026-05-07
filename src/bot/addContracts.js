@@ -1,11 +1,11 @@
-const SqliteDB = require('../db/db');
+const PostgresDB = require('../db/db');
 const { priceTracker } = require('../ws/wsClient');
 const BybitClient = require('../rest/bybitRest');
 const bybitClient = new BybitClient();
 const { getContractsKeyboard, getIntervalsKeyboard } = require('./keyboards');
 const {updateHistoryData} = require('./add_contracts/update_ohlc_in_bybit');
 
-const dbService = new SqliteDB();
+const dbService = new PostgresDB();
 const userStates = new Map();
 
 const SYMBOL_REGEX = /^[A-Z0-9]{2,}USDT$/;

@@ -1,7 +1,7 @@
 // price-tracker.js
 const WebSocket = require('ws');
-const SqliteDB = require('../db/db');
-const dbService = new SqliteDB('./candles.db');
+const PostgresDB = require('../db/db');
+const dbService = new PostgresDB();
 const { EventEmitter }  = require('events');
 
 // ===================== НАСТРОЙКИ =====================
@@ -159,7 +159,7 @@ class BybitPriceTracker extends EventEmitter {
 
   // Очистить livePrices для удаленных символов
   async _cleanupOldSymbols() {
-    const currentSymbols = new Set(await dbService.uniqueSymbol('trackingContracts'));
+    const currentSymbols = new Set(await dbService.uniqueSymbol('tracking_contracts'));
     
     for (const symbol of this.livePrices.keys()) {
       if (!currentSymbols.has(symbol)) {
@@ -173,7 +173,7 @@ class BybitPriceTracker extends EventEmitter {
   async refreshSubscriptions() {
     try {
       // Обновляем список подписанных символов из БД
-      const contracts = await dbService.uniqueSymbol('trackingContracts');
+      const contracts = await dbService.uniqueSymbol('tracking_contracts');
       
       if (!Array.isArray(contracts) || contracts.length === 0) {
         console.warn('❌ Нет контрактов для отслеживания');

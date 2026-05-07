@@ -1,4 +1,4 @@
-const SQLiteDB = require('../db/db');
+const PostgresDB = require('../db/db');
 const { priceTracker } = require('../ws/wsClient');
 
 const runScript = async (ctx) => {

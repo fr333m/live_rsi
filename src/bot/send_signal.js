@@ -1,5 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const config = require('../config/config');
+const { generateChart } = require('../chart/generateChart');
  // Убедись что путь правильный
 
 const TELEGRAM_BOT_TOKEN = config.TELEGRAM_BOT_TOKEN;
@@ -7,28 +8,38 @@ const TELEGRAM_CHAT_ID = config.TELEGRAM_CHAT_ID;
 
 const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
 
+
 /**
  * Отправляет торговое оповещение RSI Top с графиком и кнопками действий
- * @param {string} symbol - Наименование торгового инструмента (например: BTCUSDT, ETHUSDT)
- * @param {string} interval - Таймфрейм (например: 1h, 4h, 1d)
- * @returns {Promise<object>} - Объект с результатом отправки сообщения
+ * @param {string} symbol
+ * @param {string} interval
+ * @param {string} signalType
+ * @param {string} dataTime
+ * @returns {Promise<object>}
  */
- async function sendSignal(symbol, interval, signalType, dataTime) {
+async function sendSignal(symbol, interval, signalType, dataTime) {
+
     try {
 
-        // Формируем текст сообщения с информацией об оповещении
+        // Генерация графика
+        const imageBuffer = await generateChart(
+            symbol,
+            interval
+        );
+
+        // Текст сообщения
         const messageText = `
 🚨 *RSI TOP ALERT*
 
 📊 Инструмент: *${symbol}*
 ⏱️ Таймфрейм: *${interval}*
 🔔 Сигнал: *${signalType}*
-⏱️ - *${dataTime}*
+⏱️ Время: *${dataTime}*
 
 *Анализ показывает потенциальное движение вверх по этому инструменту.*
         `.trim();
 
-        // Формируем клавиатуру с кнопками действий
+        // Кнопки
         const keyboard = {
             inline_keyboard: [
                 [
@@ -40,17 +51,23 @@ const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
             ]
         };
 
-        // Отправляем сообщение с кнопками
-        const result = await bot.sendMessage(
+        // Отправка изображения с подписью
+        const result = await bot.sendPhoto(
             TELEGRAM_CHAT_ID,
-            messageText,
+            imageBuffer,
             {
+                caption: messageText,
+
                 parse_mode: 'Markdown',
+
                 reply_markup: keyboard
             }
         );
 
-        console.log(`✅ Оповещение успешно отправлено для ${symbol} (${interval})`);
+        console.log(
+            `✅ Оповещение успешно отправлено для ${symbol} (${interval})`
+        );
+
         return {
             success: true,
             messageId: result.message_id,
@@ -60,7 +77,12 @@ const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
         };
 
     } catch (error) {
-        console.error(`❌ Ошибка при отправке оповещения для ${symbol}:`, error.message);
+
+        console.error(
+            `❌ Ошибка при отправке оповещения для ${symbol}:`,
+            error.message
+        );
+
         return {
             success: false,
             error: error.message,

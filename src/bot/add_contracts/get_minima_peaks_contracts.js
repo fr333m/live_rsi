@@ -1,13 +1,13 @@
 const {findMinima} = require('./find_minima');
 const {formatTimestamp} = require('./transform_timestamp');
-const SqliteDB = require('../../../src/db/db');
-const dbService = new SqliteDB('./candles.db');
+const PostgresDB = require('../../../src/db/db');
+const dbService = new PostgresDB();
 
 
 
 async function getMinimaPeaksPriceContracts(symbol, interval) {
     const limit = 215;
-    const ohlcData = await dbService.getCandles(symbol, interval, 'trackingContracts', limit);
+    const ohlcData = await dbService.getCandles(symbol, interval, 'tracking_contracts', limit);
     const ohlcSlice = ohlcData.slice(0, ohlcData.length - 5);
 
 
@@ -20,6 +20,7 @@ const peaks = await findMinima(ohlcSlice, symbol);
     
 
 // await dbService.saveFilteredMinimum(symbol, interval, peaks);
+console.log(peaks, "FOR", symbol);
 return peaks;
 
 }

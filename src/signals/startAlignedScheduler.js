@@ -1,5 +1,5 @@
-const SqliteDB = require('../db/db');
-const dbService = new SqliteDB('./candles.db');
+const PostgresDB = require('../db/db');
+const dbService = new PostgresDB();
 const {updateOHLC} = require('./updateOHLC');
 const { priceTracker } = require('../ws/wsClient');
 const {calculationRSI} = require('./rsi/rsi');
@@ -46,8 +46,8 @@ function startAlignedScheduler() {
 
   async function onTick() {
     let type = '';
-    const symbolUnique_1m = await dbService.uniqueSymbol('trackingContracts', '1');
-    const symbolUnique_5m = await dbService.uniqueSymbol('trackingContracts', '5');
+    const symbolUnique_1m = await dbService.uniqueSymbol('tracking_contracts', '1');
+    const symbolUnique_5m = await dbService.uniqueSymbol('tracking_contracts', '5');
     const now = new Date();
     const m = now.getMinutes();
 

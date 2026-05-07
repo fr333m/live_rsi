@@ -1,7 +1,7 @@
 const { getRsi } = require('./rsi_value');
 const {sendSignal} = require('../../../src/bot/send_signal');
-const SqliteDB = require('../../../src/db/db');
-const dbService = new SqliteDB('./candles.db');
+const PostgresDB = require('../../../src/db/db');
+const dbService = new PostgresDB();
 const {checkActualSignal} = require('../check_actual_signal');
 
 async function calculationRSI(interval) {
@@ -12,7 +12,7 @@ async function calculationRSI(interval) {
 
     for (const symbol of uniqueSymbols) {
         console.log('calculationRSI() started.');
-        const ohlc =  await dbService.getCandles(symbol, interval, 'trackingContracts');
+        const ohlc =  await dbService.getCandles(symbol, interval, 'tracking_contracts');
         const currentTimestamp = ohlc[ohlc.length - 1].timestamp;
   
     console.log(`calculationRSI() received ${uniqueSymbols.length} symbols for RSI analysis.`);
@@ -26,7 +26,7 @@ async function calculationRSI(interval) {
       continue;
     }
 
-    const actualSignal = await checkActualSignal(symbol, interval, currentTimestamp, typeSignal);
+    const actualSignal = await checkActualSignal(symbol, interval, currentTimestamp, typeSignal, currentTimestamp);
 
     if(actualSignal === false){
       continue;

@@ -1,6 +1,6 @@
 const  {priceTracker} = require('./src/ws/wsClient');
-const SqliteDB = require('./src/db/db');
-const dbService = new SqliteDB('./candles.db');
+const PostgresDB = require('./src/db/db');
+const dbService = new PostgresDB();
 const BybitClient = require('./src/rest/bybitRest');
 const bybitClient = new BybitClient();
 const { createBot } = require('./src/bot/bot');
@@ -11,19 +11,23 @@ const { getPeaksPriceContracts } = require('./src/bot/add_contracts/get_peaks_pr
 const { findSignal } = require('./src/signals/find_signal');
 const {runSearchSignal} = require('./src/signals/run_search_signal');
 
+
 async function printTable(){
      await dbService.printTable('control_send_signal');
-    //  const candles = await dbService.getCandles('TONUSDT', '1', 'trackingContracts', 200)
+     const ohlcData = await dbService.getCandles('LABUSDT', '1', 'tracking_contracts', 400);
+     console.log(ohlcData);
+    //  const candles = await dbService.getCandles('TONUSDT', '1', 'tracking_contracts', 200)
     // //  const arrSlice = candles.slice(150, candles.length - 3);
     // const currentPrice = await dbService.getLastMinutePrices('TONUSDT');
-    // const lastPriceData = await dbService.getLivePricesBySymbol('TONUSDT');
-    //  console.log(lastPriceData[lastPriceData.length - 1].timestamp);
+    // const lastpriceData = await dbService.getLivePricesBySymbol('LABUSDT');
+    //  console.log(lastpriceData);
 }
 // printTable();
 
+
 setInterval(async () => {
     await runSearchSignal();
-}, 500);
+}, 1000);
 
 startAlignedScheduler();
 

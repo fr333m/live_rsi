@@ -1,10 +1,10 @@
 const BybitClient = require('../../rest/bybitRest');
-const SqliteDB = require('../../db/db');
-const dbService = new SqliteDB('./candles.db');
+const PostgresDB = require('../../db/db');
+const dbService = new PostgresDB();
 const bybitClient = new BybitClient();
 
 async function updateHistoryData(symbol, interval) {
-    const ohlcData = await bybitClient.getCandles(symbol, interval, 300);
+    const ohlcData = await bybitClient.getCandles(symbol, interval, 400);
     await dbService.saveCandles(symbol, interval, ohlcData);
     return;
 }
