@@ -37,73 +37,88 @@ class PostgresDB {
   /**
    * Initialize the database by creating tables if they don't exist.
    */
-  async init() {
-    // tracking_contracts
-    await this.query(`
-      CREATE TABLE IF NOT EXISTS tracking_contracts (
-        id        SERIAL PRIMARY KEY,
-        symbol    TEXT    NOT NULL,
-        timestamp BIGINT  NOT NULL,
-        open      DOUBLE PRECISION NOT NULL,
-        high      DOUBLE PRECISION NOT NULL,
-        low       DOUBLE PRECISION NOT NULL,
-        close     DOUBLE PRECISION NOT NULL,
-        interval  TEXT    NOT NULL,
-        datetime  TIMESTAMP NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(symbol, timestamp, interval)
-      );
-    `);
+async init() {
+    try {
+        // === tracking_contracts ===
+        await this.query(`
+            CREATE TABLE IF NOT EXISTS tracking_contracts (
+                id          SERIAL PRIMARY KEY,
+                symbol      TEXT NOT NULL,
+                timestamp   BIGINT NOT NULL,
+                open        DOUBLE PRECISION NOT NULL,
+                high        DOUBLE PRECISION NOT NULL,
+                low         DOUBLE PRECISION NOT NULL,
+                close       DOUBLE PRECISION NOT NULL,
+                interval    TEXT NOT NULL,
+                datetime    TIMESTAMP NOT NULL,
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                
+                UNIQUE(symbol, timestamp, interval)
+            );
+        `);
 
-    // live_prices
-    await this.query(`
-      CREATE TABLE IF NOT EXISTS live_prices (
-        id         SERIAL PRIMARY KEY,
-        symbol     TEXT    NOT NULL,
-        lastprice  DOUBLE PRECISION,
-        markPrice  DOUBLE PRECISION,
-        indexPrice DOUBLE PRECISION,
-        timestamp  BIGINT  NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
+        // Добавляем индексы для скорости (очень важно!)
+        await this.query(`CREATE INDEX IF NOT EXISTS idx_tracking_symbol_interval ON tracking_contracts(symbol, interval);`);
+        await this.query(`CREATE INDEX IF NOT EXISTS idx_tracking_timestamp ON tracking_contracts(timestamp);`);
+        await this.query(`CREATE INDEX IF NOT EXISTS idx_tracking_symbol_ts ON tracking_contracts(symbol, timestamp);`);
 
-    // all_contracts_tracking
-    await this.query(`
-      CREATE TABLE IF NOT EXISTS all_contracts_tracking (
-        id         SERIAL PRIMARY KEY,
-        symbol     TEXT    NOT NULL,
-        interval   TEXT    NOT NULL,
-        volatility DOUBLE PRECISION
-      );
-    `);
+        // === live_prices ===
+        await this.query(`
+            CREATE TABLE IF NOT EXISTS live_prices (
+                id          SERIAL PRIMARY KEY,
+                symbol      TEXT NOT NULL,
+                lastprice   DOUBLE PRECISION,
+                markPrice   DOUBLE PRECISION,
+                indexPrice  DOUBLE PRECISION,
+                timestamp   BIGINT NOT NULL,
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
 
-    // filteredMinimum
-    await this.query(`
-      CREATE TABLE IF NOT EXISTS filtered_minimum (
-        id        SERIAL PRIMARY KEY,
-        symbol    TEXT    NOT NULL,
-        timestamp BIGINT  NOT NULL,
-        datetime  TIMESTAMP NOT NULL,
-        price     DOUBLE PRECISION NOT NULL,
-        interval  TEXT    NOT NULL
-      );
-    `);
+        await this.query(`CREATE INDEX IF NOT EXISTS idx_live_symbol ON live_prices(symbol);`);
+        await this.query(`CREATE INDEX IF NOT EXISTS idx_live_timestamp ON live_prices(timestamp);`);
 
-    // control_send_signal
-    await this.query(`
-      CREATE TABLE IF NOT EXISTS control_send_signal (
-        id          SERIAL PRIMARY KEY,
-        symbol      TEXT   NOT NULL,
-        timestamp   BIGINT NOT NULL,
-        interval    TEXT   NOT NULL,
-        type_signal TEXT   NOT NULL,
-        level_timestamp BIGINT NOT NULL
-      );
-    `);
+        // === остальные таблицы ===
+        await this.query(`
+            CREATE TABLE IF NOT EXISTS all_contracts_tracking (
+                id         SERIAL PRIMARY KEY,
+                symbol     TEXT NOT NULL,
+                interval   TEXT NOT NULL,
+                volatility DOUBLE PRECISION,
+                UNIQUE(symbol, interval)
+            );
+        `);
 
-    console.log('Connected to PostgreSQL database and tables ensured.');
-  }
+        await this.query(`
+            CREATE TABLE IF NOT EXISTS filtered_minimum (
+                id        SERIAL PRIMARY KEY,
+                symbol    TEXT NOT NULL,
+                timestamp BIGINT NOT NULL,
+                datetime  TIMESTAMP NOT NULL,
+                price     DOUBLE PRECISION NOT NULL,
+                interval  TEXT NOT NULL,
+                UNIQUE(symbol, timestamp, interval)
+            );
+        `);
+
+        await this.query(`
+            CREATE TABLE IF NOT EXISTS control_send_signal (
+                id              SERIAL PRIMARY KEY,
+                symbol          TEXT NOT NULL,
+                timestamp       BIGINT NOT NULL,
+                interval        TEXT NOT NULL,
+                type_signal     TEXT NOT NULL,
+                level_timestamp BIGINT NOT NULL,
+                UNIQUE(symbol, timestamp, interval, type_signal)
+            );
+        `);
+
+        console.log('✅ PostgreSQL: tables and indexes ensured successfully.');
+    } catch (err) {
+        console.error('❌ Error during DB initialization:', err);
+        throw err;
+    }
+}
 
   // ---------------------------------------------------------------------------
   // saveSendSignalControl
