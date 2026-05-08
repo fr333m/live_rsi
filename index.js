@@ -11,6 +11,13 @@ const { getPeaksPriceContracts } = require('./src/bot/add_contracts/get_peaks_pr
 const { findSignal } = require('./src/signals/find_signal');
 const {runSearchSignal} = require('./src/signals/run_search_signal');
 
+async function postgresInit(){
+    await dbService.init();
+}
+postgresInit();
+
+
+
 
 async function printTable(){
      await dbService.printTable('control_send_signal');

@@ -16,8 +16,6 @@ class PostgresDB {
       port: process.env.DB_PORT ,
       max: 20,
     });
-
-    this.init();
   }
 
   /**
