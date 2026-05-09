@@ -106,7 +106,6 @@ async init() {
                 timestamp       BIGINT NOT NULL,
                 interval        TEXT NOT NULL,
                 type_signal     TEXT NOT NULL,
-                level_timestamp BIGINT NOT NULL,
                 UNIQUE(symbol, timestamp, interval, type_signal)
             );
         `);
@@ -121,12 +120,12 @@ async init() {
   // ---------------------------------------------------------------------------
   // saveSendSignalControl
   // ---------------------------------------------------------------------------
-  async saveSendSignalControl(symbol, timestamp, interval, typeSignal, levelTimeStamp) {
+  async saveSendSignalControl(symbol, timestamp, interval, typeSignal) {
     await this.query(`
-      INSERT INTO control_send_signal (symbol, timestamp, interval, type_signal, level_timestamp)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO control_send_signal (symbol, timestamp, interval, type_signal)
+      VALUES ($1, $2, $3, $4)
       ON CONFLICT DO NOTHING
-    `, [symbol, timestamp, interval, typeSignal, levelTimeStamp]);
+    `, [symbol, timestamp, interval, typeSignal]);
     console.log('Control send signal saved successfully.');
   }
 
@@ -479,7 +478,7 @@ async init() {
   // ---------------------------------------------------------------------------
   // checkRowForTypeSignal
   // ---------------------------------------------------------------------------
- async checkRowForTypeSignal(symbol, interval, typeSignal, tableName, levelTimeStamp = null) {
+ async checkRowForTypeSignal(symbol, interval, typeSignal, tableName) {
     // Защита от SQL-инъекции через имя таблицы
     if (!/^[A-Za-z0-9_]+$/.test(tableName)) {
         throw new Error('Invalid table name');
@@ -494,11 +493,6 @@ async init() {
     `;
 
     const params = [symbol, interval, typeSignal];
-
-    if (levelTimeStamp !== null) {
-        params.push(levelTimeStamp);
-        query += ` AND level_timestamp = $${params.length}`;
-    }
 
     query += ` ORDER BY timestamp DESC LIMIT 1`;
 

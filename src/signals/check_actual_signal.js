@@ -25,7 +25,7 @@ async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelT
 
     try {
         // Проверяем по символу + интервалу (без typeSignal)
-        const existing = await dbService.checkRowForTypeSignal(symbol, interval, typeSignal, 'control_send_signal', levelTimeStamp);
+        const existing = await dbService.checkRowForTypeSignal(symbol, interval, typeSignal, 'control_send_signal');
 
         if (!existing) {
             // Первый сигнал любого типа — разрешаем
@@ -33,8 +33,7 @@ async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelT
                 symbol, 
                 normalizedTimestamp, 
                 interval, 
-                typeSignal,        // сохраняем какой именно тип сработал
-                levelTimeStamp
+                typeSignal        // сохраняем какой именно тип сработал
             );
 
             console.log(`[Signal Control] ✅ New signal allowed: ${symbol} ${interval} ${typeSignal}`);
@@ -55,8 +54,7 @@ async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelT
             symbol, 
             normalizedTimestamp, 
             interval, 
-            typeSignal, 
-            levelTimeStamp
+            typeSignal
         );
 
         console.log(`[Signal Control] ✅ Signal allowed after cooldown: ${symbol} ${interval} ${typeSignal}`);

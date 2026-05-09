@@ -20,9 +20,7 @@ postgresInit();
 
 
 async function printTable(){
-     await dbService.printTable('control_send_signal');
-     const ohlcData = await dbService.getCandles('LABUSDT', '1', 'tracking_contracts', 400);
-     console.log(ohlcData);
+     await dbService.removeTable('control_send_signal');
     //  const candles = await dbService.getCandles('TONUSDT', '1', 'tracking_contracts', 200)
     // //  const arrSlice = candles.slice(150, candles.length - 3);
     // const currentPrice = await dbService.getLastMinutePrices('TONUSDT');
