@@ -1,17 +1,19 @@
 const PostgresDB = require('../../src/db/db');
 const dbService = new PostgresDB();
 
+
+const SIGNAL_INTERVAL = 300000; // 10 минут
+
 async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelTimeStamp) {
-    console.log('LEVEL TIMESTAMPPPPPPPPPPPPPPPPPPPPPPP', levelTimeStamp);
-    if(levelTimeStamp === null){
-        return;
+    if (levelTimeStamp === null) {
+        console.warn(`[Signal Control] levelTimeStamp is null for ${symbol}`);
+        return false;
     }
 
-    // Валидация параметров
+    // Валидация
     if (!symbol?.trim() || !interval?.trim()) {
         throw new Error('symbol and interval are required');
     }
-    
     if (!typeSignal?.trim()) {
         throw new Error('typeSignal is required');
     }
@@ -21,29 +23,41 @@ async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelT
         throw new Error('timestamp must be a positive number (milliseconds)');
     }
 
-    const SIGNAL_INTERVAL = 600000; // 10 минут
-
     try {
-        // Важно: теперь ключ включает typeSignal
+        // Проверяем по символу + интервалу (без typeSignal)
         const existing = await dbService.checkRowForTypeSignal(symbol, interval, typeSignal, 'control_send_signal', levelTimeStamp);
-        
+
         if (!existing) {
-            await dbService.saveSendSignalControl(symbol, normalizedTimestamp, interval, typeSignal, levelTimeStamp);
+            // Первый сигнал любого типа — разрешаем
+            await dbService.saveSendSignalControl(
+                symbol, 
+                normalizedTimestamp, 
+                interval, 
+                typeSignal,        // сохраняем какой именно тип сработал
+                levelTimeStamp
+            );
+
             console.log(`[Signal Control] ✅ New signal allowed: ${symbol} ${interval} ${typeSignal}`);
             return true;
         }
 
         const timeDiff = normalizedTimestamp - existing.timestamp;
 
-        // Если для этого типа сигнала ещё не прошло 5 минут — блокируем
         if (timeDiff < SIGNAL_INTERVAL) {
-            console.log(`[Signal Control] ⛔ Blocked: ${symbol} ${interval} ${typeSignal} — too early (${Math.round(timeDiff/1000)}s)`);
+            console.log(`[Signal Control] ⛔ Blocked: ${symbol} ${interval} ${typeSignal} — too early (${Math.round(timeDiff/1000)}s). Last signal was ${existing.type_signal}`);
             return false;
         }
 
-        // Прошло достаточно времени — обновляем таймер
+        // Прошло достаточно времени — обновляем запись
         await dbService.removeRowOnSymbol(symbol, 'control_send_signal', existing.id);
-        await dbService.saveSendSignalControl(symbol, normalizedTimestamp, interval, typeSignal, levelTimeStamp);
+        
+        await dbService.saveSendSignalControl(
+            symbol, 
+            normalizedTimestamp, 
+            interval, 
+            typeSignal, 
+            levelTimeStamp
+        );
 
         console.log(`[Signal Control] ✅ Signal allowed after cooldown: ${symbol} ${interval} ${typeSignal}`);
         return true;
@@ -55,6 +69,59 @@ async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelT
 }
 
 module.exports = { checkActualSignal };
+// async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelTimeStamp) {
+//     if(levelTimeStamp === null){
+//         return;
+//     }
+
+//     // Валидация параметров
+//     if (!symbol?.trim() || !interval?.trim()) {
+//         throw new Error('symbol and interval are required');
+//     }
+    
+//     if (!typeSignal?.trim()) {
+//         throw new Error('typeSignal is required');
+//     }
+
+//     const normalizedTimestamp = Number(timestamp);
+//     if (isNaN(normalizedTimestamp) || normalizedTimestamp <= 0) {
+//         throw new Error('timestamp must be a positive number (milliseconds)');
+//     }
+
+//     const SIGNAL_INTERVAL = 600000; // 10 минут
+
+//     try {
+//         // Важно: теперь ключ включает typeSignal
+//         const existing = await dbService.checkRowForTypeSignal(symbol, interval, typeSignal, 'control_send_signal', levelTimeStamp);
+        
+//         if (!existing) {
+//             await dbService.saveSendSignalControl(symbol, normalizedTimestamp, interval, typeSignal, levelTimeStamp);
+//             console.log(`[Signal Control] ✅ New signal allowed: ${symbol} ${interval} ${typeSignal}`);
+//             return true;
+//         }
+
+//         const timeDiff = normalizedTimestamp - existing.timestamp;
+
+//         // Если для этого типа сигнала ещё не прошло 5 минут — блокируем
+//         if (timeDiff < SIGNAL_INTERVAL) {
+//             console.log(`[Signal Control] ⛔ Blocked: ${symbol} ${interval} ${typeSignal} — too early (${Math.round(timeDiff/1000)}s)`);
+//             return false;
+//         }
+
+//         // Прошло достаточно времени — обновляем таймер
+//         await dbService.removeRowOnSymbol(symbol, 'control_send_signal', existing.id);
+//         await dbService.saveSendSignalControl(symbol, normalizedTimestamp, interval, typeSignal, levelTimeStamp);
+
+//         console.log(`[Signal Control] ✅ Signal allowed after cooldown: ${symbol} ${interval} ${typeSignal}`);
+//         return true;
+
+//     } catch (error) {
+//         console.error(`[Signal Control Error] ${symbol} ${interval} ${typeSignal}:`, error);
+//         throw error;
+//     }
+// }
+
+// module.exports = { checkActualSignal };
 
 // async function checkActualSignal(symbol, interval, timestamp, typeSignal) {
 //     const timeOffSendSignal = await dbService.checkRow(symbol, interval, 'control_send_signal');
