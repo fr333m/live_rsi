@@ -4,7 +4,7 @@ const dbService = new PostgresDB();
 
 const SIGNAL_INTERVAL = 300000; // 10 минут
 
-async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelTimeStamp) {
+async function checkActualSignal(symbol, interval, timestamp, typeSignal) {
     if (levelTimeStamp === null) {
         console.warn(`[Signal Control] levelTimeStamp is null for ${symbol}`);
         return false;

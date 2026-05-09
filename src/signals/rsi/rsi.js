@@ -26,7 +26,7 @@ async function calculationRSI(interval) {
       continue;
     }
 
-    const actualSignal = await checkActualSignal(symbol, interval, currentTimestamp, typeSignal, currentTimestamp);
+    const actualSignal = await checkActualSignal(symbol, interval, currentTimestamp, typeSignal);
 
     if(actualSignal === false){
       continue;
