@@ -3,96 +3,94 @@ const PostgresDB = require('../../../src/db/db');
 const dbService = new PostgresDB();
 const {getRsi} = require('../../signals/rsi/rsi_value')
 
+
 async function findMaxima(candles, symbol) {
-  
+    console.log(`\n=== findMaxima START | ${symbol} | Свечей: ${candles.length} ===`);
+
     if (!candles || candles.length < 30) {
+        console.log("❌ Мало свечей для анализа максимумов");
         return [];
     }
 
-    const partSize = Math.ceil(candles.length / 7);
-    const parts = [];
-    
-    for (let p = 0; p < 7; p++) {
-        const start = p * partSize;
-        const end = Math.min(start + partSize, candles.length);
-        parts.push(candles.slice(start, end));
-    }
-
-    const results = [];
     const currentPriceData = await dbService.getLastMinutePrices(symbol);
-
-    if(currentPriceData.length <= 0){
-        return;
+    if (!currentPriceData?.length) {
+        console.log("❌ Нет данных о текущей цене");
+        return [];
     }
+
     const currentPrice = currentPriceData[0].lastprice;
+    console.log(`Текущая цена: ${currentPrice}`);
 
-    const windowSize = 10;
+    const windowSize = 6;
+    const allLocalMaxs = [];
 
-    // Шаг 1: Один лучший максимум из каждой части
-    for (let partIndex = 0; partIndex < parts.length; partIndex++) {
-        const part = parts[partIndex];
-        let bestCandle = null;
-        let bestPrice = -Infinity;
+    console.log(`\n=== Поиск локальных максимумов (window = ${windowSize}) ===`);
 
+    for (let i = windowSize; i < candles.length - windowSize; i++) {
+        const candle = candles[i];
+        const high = candle.high;
 
+        if (high < currentPrice * 0.995) continue;
 
-        for (let i = 0; i < part.length; i++) {
-            const candle = part[i];
-            const high = candle.high;                    // ← Лучше использовать high
-
-            if (high < currentPrice) continue;
-
-            // Проверка локального максимума
-            let isLocalMax = true;
-            const left = Math.max(0, i - windowSize);
-            const right = Math.min(part.length - 1, i + windowSize);
-
-            for (let j = left; j <= right; j++) {
-                if (j === i) continue;
-                if (part[j].high >= high) {              // Сравниваем high с high
-                    isLocalMax = false;
-                    break;
-                }
-            }
-
-            if (isLocalMax && high > bestPrice) {
-                bestPrice = high;
-                bestCandle = candle;
+        // Проверка локального максимума
+        let isLocalMax = true;
+        for (let j = i - windowSize; j <= i + windowSize; j++) {
+            if (j === i) continue;
+            if (candles[j].high >= high) {
+                isLocalMax = false;
+                break;
             }
         }
 
-        if (bestCandle) {
-            results.push({
-                closePrice: bestCandle.close,
-                highPrice: bestCandle.high,
-                dateTime: formatShort(bestCandle.timestamp),
-                timestamp: bestCandle.timestamp
-            });
+        if (!isLocalMax) continue;
+
+        // Информация для отладки
+        const leftHigh = Math.max(...candles.slice(Math.max(0, i - 20), i).map(c => c.high));
+        const rightHigh = Math.max(...candles.slice(i + 1, Math.min(candles.length, i + 20)).map(c => c.high));
+
+        console.log(`   [${i.toString().padStart(3)}] High = ${high.toFixed(6)} | Left20=${leftHigh.toFixed(6)} | Right20=${rightHigh.toFixed(6)} | OK`);
+
+        allLocalMaxs.push({
+            ...candle,
+            highPrice: high,
+            closePrice: candle.close,
+            dateTime: formatShort(candle.timestamp),
+            timestamp: candle.timestamp,
+            index: i
+        });
+    }
+
+    console.log(`\nНайдено локальных максимумов: ${allLocalMaxs.length}`);
+
+    if (allLocalMaxs.length === 0) {
+        console.log("❌ Не найдено ни одного локального максимума");
+        return [];
+    }
+
+    // === Финальная фильтрация: возрастающая последовательность ===
+    const finalMaxima = [allLocalMaxs[allLocalMaxs.length - 1]]; // самый новый максимум
+    
+    console.log(`\nФинальная возрастающая фильтрация...`);
+
+    for (let i = allLocalMaxs.length - 2; i >= 0; i--) {
+        const curr = allLocalMaxs[i];
+        const last = finalMaxima[finalMaxima.length - 1];
+        const diffPercent = (curr.highPrice - last.highPrice) / last.highPrice * 100;
+
+        if (curr.highPrice > last.highPrice && diffPercent > 0.08 && (last.index - curr.index) > 4) {
+            finalMaxima.push(curr);
+            console.log(`   ✅ Добавлен: ${curr.dateTime} (+${diffPercent.toFixed(2)}%)`);
+        } else {
+            console.log(`   ❌ Пропущен: ${curr.dateTime} (разница ${diffPercent.toFixed(2)}%)`);
         }
     }
 
-    if (results.length === 0) return [];
+    const result = finalMaxima.reverse();
+    console.log(`\n=== findMaxima FINISH | Возвращаем ${result.length} максимумов ===\n`);
     
-
-    // === ПРАВИЛЬНАЯ ФИЛЬТРАЦИЯ ДЛЯ МАКСИМУМОВ (возрастающая последовательность) ===
-    const filteredResults = [];
-    
-    // Начинаем с самого первого (левого) максимума
-    filteredResults.push(results[results.length - 1]);
-
-    for (let i = results.length - 2; i >= 0; i--) {
-        const prevMax = filteredResults[filteredResults.length - 1].highPrice || 
-                       filteredResults[filteredResults.length - 1].closePrice;
-        
-        const currentMax = results[i].highPrice || results[i].closePrice;
-
-        if (currentMax > prevMax) {        // строго выше предыдущего
-            filteredResults.push(results[i]);
-        }
-    }
-
-    return filteredResults;
+    return result;
 }
+
 
 
 module.exports = { findMaxima };

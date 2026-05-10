@@ -20,7 +20,7 @@ const peaks = await findMinima(ohlcSlice, symbol);
     
 
 // await dbService.saveFilteredMinimum(symbol, interval, peaks);
-// console.log(peaks, "FOR", symbol);
+console.log(peaks, "FOR MIMIMA", symbol);
 return peaks;
 
 }
