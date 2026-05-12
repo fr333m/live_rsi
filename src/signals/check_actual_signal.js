@@ -2,45 +2,74 @@ const PostgresDB = require('../../src/db/db');
 const dbService = new PostgresDB();
 
 
-const SIGNAL_INTERVAL = 300000; // 10 минут
+const SIGNAL_INTERVAL = 1800000; //  30 минут
 
-async function checkActualSignal(symbol, interval, timestamp, typeSignal) {
+async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelTimeStamp) {
     
-
-    // Валидация
+    // const row = await dbService.checkRowForTypeSignal('ETHUSDT', '1', 'double_top', 'control_send_signal', '1778589540000');
+    // console.log('Test checkRowForTypeSignal result:', row);
+    
+    // === Валидация ===
     if (!symbol?.trim() || !interval?.trim()) {
         throw new Error('symbol and interval are required');
     }
     if (!typeSignal?.trim()) {
         throw new Error('typeSignal is required');
     }
+    if (!levelTimeStamp) {
+        throw new Error('levelTimeStamp is required');
+    }
 
     const normalizedTimestamp = Number(timestamp);
+    const normalizedLevelTimeStamp = String(levelTimeStamp);
+    // console.log(`Normalized inputs: timestamp=${normalizedTimestamp}, levelTimeStamp=${normalizedLevelTimeStamp}`);
     if (isNaN(normalizedTimestamp) || normalizedTimestamp <= 0) {
         throw new Error('timestamp must be a positive number (milliseconds)');
     }
+   
+
+    
 
     try {
-        // Проверяем по символу + интервалу (без typeSignal)
-        const existing = await dbService.checkRowForTypeSignal(symbol, interval, typeSignal, 'control_send_signal');
+        // SIGNAL_INTERVAL лучше передавать параметром или брать из конфига
+
+        // Ищем запись именно по этому typeSignal
+        const existing = await dbService.checkRowForTypeSignal(
+            symbol, 
+            interval, 
+            typeSignal,        // ← важно: учитываем тип сигнала
+            'control_send_signal', 
+            String(levelTimeStamp) // ← и уровень сигнала (например, цена для RSI)
+        );
+        // console.log('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', existing);
+
 
         if (!existing) {
-            // Первый сигнал любого типа — разрешаем
+            
+             // console.log(`checkActualSignal called with: ${symbol} ${interval} ${typeSignal} at ${timestamp} ${levelTimeStamp}`);
+
+            // Первый сигнал данного типа — разрешаем
             await dbService.saveSendSignalControl(
                 symbol, 
                 normalizedTimestamp, 
                 interval, 
-                typeSignal        // сохраняем какой именно тип сработал
+                typeSignal,
+                levelTimeStamp
             );
-
-            console.log(`[Signal Control] ✅ New signal allowed: ${symbol} ${interval} ${typeSignal}`);
+            // console.log(`[Signal Control] ✅ NEW signal allowed: ${symbol} ${interval} | ${typeSignal}`);
             return true;
         }
 
-        const timeDiff = normalizedTimestamp - existing.timestamp;
+        const timeDiff = normalizedTimestamp - Number(existing.timestamp);
+
+        // console.log('BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', timeDiff, SIGNAL_INTERVAL, normalizedTimestamp, existing.timestamp);
+        
+       
+                return;
 
         if (timeDiff < SIGNAL_INTERVAL) {
-            console.log(`[Signal Control] ⛔ Blocked: ${symbol} ${interval} ${typeSignal} — too early (${Math.round(timeDiff/1000)}s). Last signal was ${existing.type_signal}`);
+            const secondsLeft = Math.round((SIGNAL_INTERVAL - timeDiff) / 1000);
+            // console.log(`[Signal Control] ⛔ BLOCKED: ${symbol} ${interval} | ${typeSignal} — cooldown ${secondsLeft}s`);
             return false;
         }
 
@@ -51,14 +80,15 @@ async function checkActualSignal(symbol, interval, timestamp, typeSignal) {
             symbol, 
             normalizedTimestamp, 
             interval, 
-            typeSignal
+            typeSignal,
+            levelTimeStamp
         );
 
-        console.log(`[Signal Control] ✅ Signal allowed after cooldown: ${symbol} ${interval} ${typeSignal}`);
+        // console.log(`[Signal Control] ✅ Signal allowed after cooldown: ${symbol} ${interval} | ${typeSignal}`);
         return true;
 
     } catch (error) {
-        console.error(`[Signal Control Error] ${symbol} ${interval} ${typeSignal}:`, error);
+        // console.error(`[Signal Control Error] ${symbol} ${interval} ${typeSignal}:`, error);
         throw error;
     }
 }

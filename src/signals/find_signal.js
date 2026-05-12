@@ -31,9 +31,9 @@ async function findSignal(symbol, interval) {
         for (const peak of peaks) {
             const priceDiffPercent = Math.abs((peak.closePrice - lastprice) / lastprice) * 100;
             if (priceDiffPercent <= volatility) {
-                const isActual = await checkActualSignal(symbol, interval, lastpriceData[lastpriceData.length - 1].timestamp, 'double_top');
+                const isActual = await checkActualSignal(symbol, interval, lastpriceData[lastpriceData.length - 1].timestamp, 'double_top', peak.timestamp);
                 if (isActual === true) {
-                    await sendSignal(symbol, interval, 'Сигнал на продажу (Peak Detected)', peak.dateTime);
+                    await sendSignal(symbol, interval, 'Сигнал на продажу (Peak Detected)', peak.dateTime, {extra: 'extra_peaks', peak});
                     return true; // отправлен сигнал, завершаем функцию
                 }
             }
@@ -43,9 +43,9 @@ async function findSignal(symbol, interval) {
         for (const minimum of minima) {
             const priceDiffPercent = Math.abs((minimum.closePrice - lastprice) / lastprice) * 100;
             if (priceDiffPercent <= volatility) {
-                const isActual = await checkActualSignal(symbol, interval, lastpriceData[lastpriceData.length - 1].timestamp, 'double_bottom');
+                const isActual = await checkActualSignal(symbol, interval, lastpriceData[lastpriceData.length - 1].timestamp, 'double_bottom', minimum.timestamp);
                 if (isActual === true) {
-                    await sendSignal(symbol, interval, 'Сигнал на покупку (Minimum Detected)', minimum.dateTime);
+                    await sendSignal(symbol, interval, 'Сигнал на покупку (Minimum Detected)', minimum.dateTime, {extra: 'extra_minima', minimum});
                     return true;
                 }
             }

@@ -106,7 +106,8 @@ async init() {
                 timestamp       BIGINT NOT NULL,
                 interval        TEXT NOT NULL,
                 type_signal     TEXT NOT NULL,
-                UNIQUE(symbol, timestamp, interval, type_signal)
+                level_timestamp BIGINT,
+                UNIQUE(symbol, timestamp, interval, type_signal, level_timestamp)
             );
         `);
 
@@ -120,14 +121,51 @@ async init() {
   // ---------------------------------------------------------------------------
   // saveSendSignalControl
   // ---------------------------------------------------------------------------
-  async saveSendSignalControl(symbol, timestamp, interval, typeSignal) {
-    await this.query(`
-      INSERT INTO control_send_signal (symbol, timestamp, interval, type_signal)
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT DO NOTHING
-    `, [symbol, timestamp, interval, typeSignal]);
-    console.log('Control send signal saved successfully.');
-  }
+  /**
+ * Сохраняет контрольную запись о отправленном сигнале
+ */
+async saveSendSignalControl(symbol, timestamp, interval, typeSignal, levelTimeStamp) {
+    try {
+        // Базовая валидация
+        if (!symbol || !interval || !typeSignal || !levelTimeStamp) {
+            throw new Error('Missing required parameters for saveSendSignalControl');
+        }
+
+        const normalizedTimestamp = Number(timestamp);
+        if (isNaN(normalizedTimestamp)) {
+            throw new Error('Timestamp must be a valid number');
+        }
+
+        const result = await this.query(`
+            INSERT INTO control_send_signal 
+                (symbol, timestamp, interval, type_signal, level_timestamp)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT DO NOTHING
+            RETURNING id
+        `, [symbol, normalizedTimestamp, interval, typeSignal, levelTimeStamp]);
+
+        if (result.rowCount > 0) {
+            console.log(`[Control Save] ✅ Successfully saved: ${symbol} | ${interval} | ${typeSignal}`);
+        } else {
+            console.log(`[Control Save] ⚠️ Already exists (ON CONFLICT): ${symbol} | ${interval} | ${typeSignal}`);
+        }
+
+        return result.rowCount > 0; // возвращаем true, если была вставка
+
+    } catch (error) {
+        console.error(`[Control Save ERROR] Failed to save signal control:`, {
+            symbol,
+            interval,
+            typeSignal,
+            levelTimeStamp,
+            error: error.message,
+            stack: error.stack
+        });
+        
+        // Перебрасываем ошибку дальше, чтобы вызывающая функция могла обработать
+        throw new Error(`saveSendSignalControl failed for ${symbol} ${interval} ${typeSignal}: ${error.message}`);
+    }
+}
 
   // ---------------------------------------------------------------------------
   // saveFilteredMinimum
@@ -158,43 +196,87 @@ async init() {
   // saveCandles
   // ---------------------------------------------------------------------------
   async saveCandles(symbol, interval, candles) {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-      for (const candle of candles) {
-        const timestamp = parseInt(candle[0]);
-        const open      = parseFloat(candle[1]);
-        const high      = parseFloat(candle[2]);
-        const low       = parseFloat(candle[3]);
-        const close     = parseFloat(candle[4]);
-        const datetime  = new Date(timestamp).toISOString().slice(0, 19).replace('T', ' ');
+  if (!candles?.length) return;
 
-        await client.query(`
-          INSERT INTO tracking_contracts (symbol, timestamp, open, high, low, close, interval, datetime)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-          ON CONFLICT (symbol, timestamp, interval) DO NOTHING
-        `, [symbol, timestamp, open, high, low, close, interval, datetime]);
-      }
-      await client.query('COMMIT');
-      await this._cleanupCandlesTable();
-      console.log('Candles saved successfully.');
-    } catch (err) {
-      await client.query('ROLLBACK');
-      console.error('Error saving candles:', err.message);
-      throw err;
-    } finally {
-      client.release();
-    }
+  const client = await this.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Подготовка данных для bulk insert
+    const values = [];
+    const placeholders = [];
+
+    candles.forEach((candle, i) => {
+      const timestamp = parseInt(candle[0]);
+      const open  = parseFloat(candle[1]);
+      const high  = parseFloat(candle[2]);
+      const low   = parseFloat(candle[3]);
+      const close = parseFloat(candle[4]);
+
+      const idx = i * 8;
+      placeholders.push(`($${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8})`);
+
+      values.push(
+        symbol,
+        timestamp,
+        open,
+        high,
+        low,
+        close,
+        interval,
+        new Date(timestamp).toISOString().slice(0, 19).replace('T', ' ')
+      );
+    });
+
+    const query = `
+      INSERT INTO tracking_contracts 
+        (symbol, timestamp, open, high, low, close, interval, datetime)
+      VALUES ${placeholders.join(',')}
+      ON CONFLICT (symbol, timestamp, interval) DO NOTHING
+    `;
+
+    await client.query(query, values);
+
+    await client.query('COMMIT');
+
+    // Очистка — только если действительно нужно
+    await this._cleanupCandlesTable();
+
+    console.log(`Saved ${candles.length} candles for ${symbol} ${interval}`);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error saving candles:', err.message);
+    throw err;
+  } finally {
+    client.release();
   }
+}
 
-  async _cleanupCandlesTable() {
-    const res = await this.query(`SELECT COUNT(*) AS total FROM tracking_contracts`);
-    const total = parseInt(res.rows[0].total, 10);
-    if (total < 100000) return;
+ async _cleanupCandlesTable() {
+  // Вариант A — оставить последние N записей (рекомендую)
+  const MAX_ROWS = 200_000;
+  
+  const res = await this.query(`
+    SELECT COUNT(*) AS total FROM tracking_contracts
+  `);
+  
+  const total = parseInt(res.rows[0].total);
 
-    await this.query(`DELETE FROM tracking_contracts`);
-    console.log(`Таблица очищена. Было строк: ${total}`);
-  }
+  if (total < MAX_ROWS) return;
+
+  // Удаляем самые старые записи, оставляем последние 400k
+  await this.query(`
+    DELETE FROM tracking_contracts
+    WHERE ctid IN (
+      SELECT ctid 
+      FROM tracking_contracts 
+      ORDER BY timestamp ASC 
+      LIMIT $1
+    )
+  `, [total - 100_000]);
+
+  console.log(`Cleanup done. Removed ${total - 100_000} old rows.`);
+}
 
   // ---------------------------------------------------------------------------
   // gettracking_contracts
@@ -478,7 +560,7 @@ async init() {
   // ---------------------------------------------------------------------------
   // checkRowForTypeSignal
   // ---------------------------------------------------------------------------
- async checkRowForTypeSignal(symbol, interval, typeSignal, tableName) {
+ async checkRowForTypeSignal(symbol, interval, typeSignal, tableName, levelTimeStamp) {
     // Защита от SQL-инъекции через имя таблицы
     if (!/^[A-Za-z0-9_]+$/.test(tableName)) {
         throw new Error('Invalid table name');
@@ -491,8 +573,13 @@ async init() {
           AND interval = $2 
           AND type_signal = $3
     `;
-
     const params = [symbol, interval, typeSignal];
+    if (levelTimeStamp !== null) {
+        params.push(levelTimeStamp);
+        query += ` AND level_timestamp = $4`;
+    }
+
+    
 
     query += ` ORDER BY timestamp DESC LIMIT 1`;
 
@@ -624,7 +711,7 @@ async init() {
         AND timestamp >= (
           SELECT MAX(timestamp) - 60000 FROM live_prices WHERE symbol = $1
         )
-      ORDER BY timestamp DESC
+      ORDER BY timestamp ASC
     `, [symbol]);
     return res.rows;
   }

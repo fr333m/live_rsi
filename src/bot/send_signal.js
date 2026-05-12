@@ -17,14 +17,15 @@ const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
  * @param {string} dataTime
  * @returns {Promise<object>}
  */
-async function sendSignal(symbol, interval, signalType, dataTime) {
+async function sendSignal(symbol, interval, signalType, dataTime, extraData) {
 
     try {
 
         // Генерация графика
         const imageBuffer = await generateChart(
             symbol,
-            interval
+            interval,
+            extraData
         );
 
         // Текст сообщения

@@ -6,7 +6,7 @@ const dbService = new PostgresDB();
 
 
 async function getPeaksPriceContracts(symbol, interval) {
-    const limit = 215;
+    const limit = 300;
     const ohlcData = await dbService.getCandles(symbol, interval, 'tracking_contracts', limit);
     const ohlcSlice = ohlcData.slice(0, ohlcData.length - 5);
 
@@ -18,7 +18,7 @@ async function getPeaksPriceContracts(symbol, interval) {
 
 const peaks = await findMaxima(ohlcSlice, symbol);
 
-console.log(peaks, "FOR", symbol);
+//console.log(peaks, "FOR", symbol);
 return peaks;
 
 }

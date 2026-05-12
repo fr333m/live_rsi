@@ -6,7 +6,7 @@ const dbService = new PostgresDB();
 
 
 async function getMinimaPeaksPriceContracts(symbol, interval) {
-    const limit = 215;
+    const limit = 300;
     const ohlcData = await dbService.getCandles(symbol, interval, 'tracking_contracts', limit);
     const ohlcSlice = ohlcData.slice(0, ohlcData.length - 5);
 

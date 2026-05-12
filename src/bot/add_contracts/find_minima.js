@@ -4,32 +4,32 @@ const dbService = new PostgresDB();
 const {getRsi} = require('../../signals/rsi/rsi_value');
 
 async function findMinima(candles, symbol) {
-    console.log(`\n=== findMinima START | ${symbol} | Свечей: ${candles.length} ===`);
+   // console.log(`\n=== findMinima START | ${symbol} | Свечей: ${candles.length} ===`);
 
     if (!candles || candles.length < 30) {
-        console.log("❌ Мало свечей");
+        // console.log("❌ Мало свечей");
         return [];
     }
 
     const currentPriceData = await dbService.getLastMinutePrices(symbol);
     if (!currentPriceData?.length) {
-        console.log("❌ Нет данных о текущей цене");
+        // console.log("❌ Нет данных о текущей цене");
         return [];
     }
 
-    const currentPrice = currentPriceData[0].lastprice;
-    console.log(`Текущая цена: ${currentPrice}`);
+    const currentPrice = currentPriceData[currentPriceData.length - 1].lastprice;
+    // console.log(`Текущая цена: ${currentPrice}`);
 
     const windowSize = 6;
     const allLocalMins = [];
 
-    console.log(`\n=== Поиск локальных минимумов (window = ${windowSize}) ===`);
+    // console.log(`\n=== Поиск локальных минимумов (window = ${windowSize}) ===`);
 
     for (let i = windowSize; i < candles.length - windowSize; i++) {
         const candle = candles[i];
         const low = candle.low;
 
-        if (low > currentPrice * 1.005) continue;
+        if (low > currentPrice) continue;
 
         // Проверка — является ли минимумом в окне
         let isLocalMin = true;
@@ -46,7 +46,7 @@ async function findMinima(candles, symbol) {
         const leftLow = Math.min(...candles.slice(Math.max(0, i - 20), i).map(c => c.low));
         const rightLow = Math.min(...candles.slice(i + 1, Math.min(candles.length, i + 20)).map(c => c.low));
 
-        console.log(`   [${i.toString().padStart(3)}] Low = ${low.toFixed(6)} | Left20=${leftLow.toFixed(6)} | Right20=${rightLow.toFixed(6)} | OK`);
+        // console.log(`   [${i.toString().padStart(3)}] Low = ${low.toFixed(6)} | Left20=${leftLow.toFixed(6)} | Right20=${rightLow.toFixed(6)} | OK`);
 
         allLocalMins.push({
             ...candle,
@@ -58,17 +58,17 @@ async function findMinima(candles, symbol) {
         });
     }
 
-    console.log(`\nНайдено локальных минимумов: ${allLocalMins.length}`);
+    // console.log(`\nНайдено локальных минимумов: ${allLocalMins.length}`);
 
     if (allLocalMins.length === 0) {
-        console.log("❌ Не найдено ни одного локального минимума");
+        // console.log("❌ Не найдено ни одного локального минимума");
         return [];
     }
 
     // === Финальная фильтрация (убывающая последовательность) ===
     const finalMinima = [allLocalMins[allLocalMins.length - 1]]; // самый новый минимум
     
-    console.log(`\nФинальная убывающая фильтрация...`);
+    // console.log(`\nФинальная убывающая фильтрация...`);
 
     for (let i = allLocalMins.length - 2; i >= 0; i--) {
         const curr = allLocalMins[i];
@@ -77,14 +77,14 @@ async function findMinima(candles, symbol) {
 
         if (curr.lowPrice < last.lowPrice && diffPercent > 0.08 && (last.index - curr.index) > 4) {
             finalMinima.push(curr);
-            console.log(`   ✅ Добавлен: ${curr.dateTime} (-${diffPercent.toFixed(2)}%)`);
+            // console.log(`   ✅ Добавлен: ${curr.dateTime} (-${diffPercent.toFixed(2)}%)`);
         } else {
-            console.log(`   ❌ Пропущен: ${curr.dateTime} (разница ${diffPercent.toFixed(2)}%)`);
+            // console.log(`   ❌ Пропущен: ${curr.dateTime} (разница ${diffPercent.toFixed(2)}%)`);
         }
     }
 
     const result = finalMinima.reverse();
-    console.log(`\n=== findMinima FINISH | Возвращаем ${result.length} минимумов ===\n`);
+    // console.log(`\n=== findMinima FINISH | Возвращаем ${result.length} минимумов ===\n`);
     
     return result;
 }

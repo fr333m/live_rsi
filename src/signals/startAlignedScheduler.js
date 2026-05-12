@@ -59,7 +59,7 @@ function startAlignedScheduler() {
          if (priceTracker.ws && priceTracker.ws.readyState === 1) {
           for (const symbol of symbolUnique_1m) {
           await updateOHLC(symbol, '1');
-          await calculationRSI('1');
+          // await calculationRSI('1');
         }
         } else {
           await priceTracker.start();
@@ -71,7 +71,7 @@ function startAlignedScheduler() {
       jobQueue.push(async () => {
         for (const symbol of symbolUnique_5m) {
           await updateOHLC(symbol, '5');
-          await calculationRSI('5');
+          // await calculationRSI('5');
         }
       });
     }
