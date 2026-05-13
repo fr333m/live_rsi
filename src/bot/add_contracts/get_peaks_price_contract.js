@@ -1,28 +1,27 @@
-const {findMaxima} = require('./find_local_maxima');
-const {formatTimestamp} = require('./transform_timestamp');
+const { findMaxima } = require('./find_local_maxima');
 const PostgresDB = require('../../../src/db/db');
 const dbService = new PostgresDB();
 
-
-
-async function getPeaksPriceContracts(symbol, interval) {
+async function getPeaksPriceContracts(symbol, interval, currentTime) {
     const limit = 300;
-    const ohlcData = await dbService.getCandles(symbol, interval, 'tracking_contracts', limit);
-    const ohlcSlice = ohlcData.slice(0, ohlcData.length - 5);
+    const ohlcData = await dbService.getCandles(
+        symbol,
+        interval,
+        'tracking_contracts',
+        limit
+    );
+    const ohlcSlice = ohlcData.slice(0, ohlcData.length - 3);
 
     if (ohlcData.length === 0) {
         return [];
     }
 
+    const peaks = await findMaxima(ohlcSlice, symbol, currentTime);
 
-
-const peaks = await findMaxima(ohlcSlice, symbol);
-
-//console.log(peaks, "FOR", symbol);
-return peaks;
-
+    console.log(peaks, 'FOR', symbol);
+    return peaks;
 }
 
 module.exports = {
-    getPeaksPriceContracts
-}
+    getPeaksPriceContracts,
+};

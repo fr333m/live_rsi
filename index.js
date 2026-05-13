@@ -1,27 +1,35 @@
-const  {priceTracker} = require('./src/ws/wsClient');
+const { priceTracker } = require('./src/ws/wsClient');
 const PostgresDB = require('./src/db/db');
 const dbService = new PostgresDB();
 const BybitClient = require('./src/rest/bybitRest');
 const bybitClient = new BybitClient();
 const { createBot } = require('./src/bot/bot');
-const {updateOHLC} = require('./src/signals/updateOHLC');
-const { startAlignedScheduler } = require('./src/signals/startAlignedScheduler');
-const { getMinimaPeaksPriceContracts } = require('./src/bot/add_contracts/get_minima_peaks_contracts');
-const { getPeaksPriceContracts } = require('./src/bot/add_contracts/get_peaks_price_contract');
+const { updateOHLC } = require('./src/signals/updateOHLC');
+const {
+    startAlignedScheduler,
+} = require('./src/signals/startAlignedScheduler');
+const {
+    getMinimaPeaksPriceContracts,
+} = require('./src/bot/add_contracts/get_minima_peaks_contracts');
+const {
+    getPeaksPriceContracts,
+} = require('./src/bot/add_contracts/get_peaks_price_contract');
 const { findSignal } = require('./src/signals/find_signal');
-const {runSearchSignal} = require('./src/signals/run_search_signal');
+const { runSearchSignal } = require('./src/signals/run_search_signal');
+const priceCache = require('./src/ws/priceCache');
 
-async function postgresInit(){
+async function postgresInit() {
     await dbService.init();
 }
 postgresInit();
 
-
-
-
-async function printTable(){
-    const candles = await dbService.printTable('control_send_signal', 100);
-    // const row = await dbService.checkRowForTypeSignal('ETHUSDT', '1', 'double_top', 'control_send_signal', 1778591460000);
+async function printTable() {
+    // const lastpriceData = priceCache.getLast('SOLUSDT');
+    // const lastprice = lastpriceData.lastprice;
+    // const candles = await dbService.printTable('tracking_contracts', 600);
+    const lastPrice = await getPeaksPriceContracts('SOLUSDT', '5', 300000);
+    console.log(lastPrice);
+    // const row = await dbService.checkRowForTypeSignal('ADAUSDT', '1', 'double_top', 'control_send_signal', 1778591460000);
     // console.log(typeof row.timestamp);
 
     //  const candles = await dbService.getCandles('TONUSDT', '1', 'tracking_contracts', 200)
@@ -30,14 +38,14 @@ async function printTable(){
     // const lastpriceData = await dbService.getLivePricesBySymbol('LABUSDT');
     //  console.log(lastpriceData);
 }
-// printTable();
+printTable();
 
+async function test() {
+    await priceTracker.start();
+}
+// test();
 
-setInterval(async () => {
-    await runSearchSignal();
-}, 1000);
-
-startAlignedScheduler();
+// startAlignedScheduler();
 
 console.log('🚀 Запуск бота...');
 
@@ -76,3 +84,14 @@ process.once('SIGTERM', () => {
         process.exit(0);
     }
 });
+
+// setInterval(async () => {
+//     const cache = await priceCache.flush();
+//     console.log('Кэш цен:', cache);
+// }, 10000);
+
+// test();
+
+// setInterval(async () => {
+//     await runSearchSignal();
+// }, 1000);
