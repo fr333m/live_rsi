@@ -45,7 +45,7 @@ async function test() {
 }
 // test();
 
-// startAlignedScheduler();
+startAlignedScheduler();
 
 console.log('🚀 Запуск бота...');
 
