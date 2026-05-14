@@ -10,7 +10,7 @@ async function getPeaksPriceContracts(symbol, interval, currentTime) {
         'tracking_contracts',
         limit
     );
-    const ohlcSlice = ohlcData.slice(0, ohlcData.length - 3);
+    const ohlcSlice = ohlcData.slice(0, ohlcData.length - 10);
 
     if (ohlcData.length === 0) {
         return [];

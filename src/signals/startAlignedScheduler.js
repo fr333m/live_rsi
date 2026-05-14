@@ -7,6 +7,7 @@ const { saveLivePrice } = require('./save_live_price');
 const {
     runSearchSignal_for_1m,
     runSearchSignal_for_5m,
+    runSearchSignal_for_15m,
 } = require('./run_search_signal');
 
 let isQueueRunning = false;
@@ -50,27 +51,29 @@ function startAlignedScheduler() {
 
     async function onTick() {
         let type = '';
-        const symbolUnique_1m = await dbService.uniqueSymbol(
-            'tracking_contracts',
-            '1'
-        );
-        const symbolUnique_5m = await dbService.uniqueSymbol(
-            'tracking_contracts',
-            '5'
-        );
+        const [symbolUnique_1m, symbolUnique_5m, symbolUnique_15m] =
+            await Promise.all([
+                dbService.uniqueSymbol('tracking_contracts', '1'),
+                dbService.uniqueSymbol('tracking_contracts', '5'),
+                dbService.uniqueSymbol('tracking_contracts', '15'),
+            ]);
         const now = new Date();
         const m = now.getMinutes();
 
         console.log(`вЏ± Tick at ${now.toISOString()}`);
 
-        await saveLivePrice();
+        if (m % 1 === 0) {
+            await saveLivePrice();
+        }
 
         if (m % 1 === 0 && symbolUnique_1m.length > 0) {
             jobQueue.push(async () => {
                 if (priceTracker.ws && priceTracker.ws.readyState === 1) {
-                    for (const symbol of symbolUnique_1m) {
-                        await updateOHLC(symbol, '1', 60000);
-                    }
+                    await Promise.all(
+                        symbolUnique_1m.map((symbol) =>
+                            updateOHLC(symbol, '1', 60000)
+                        )
+                    );
                     await runSearchSignal_for_1m(60000);
                 } else {
                     await priceTracker.start();
@@ -82,11 +85,27 @@ function startAlignedScheduler() {
         if (m % 5 === 0 && symbolUnique_5m.length > 0) {
             jobQueue.push(async () => {
                 if (priceTracker.ws && priceTracker.ws.readyState === 1) {
-                    for (const symbol of symbolUnique_5m) {
-                        await updateOHLC(symbol, '5', 300000);
-                        // await calculationRSI('5');
-                    }
+                    await Promise.all(
+                        symbolUnique_5m.map((symbol) =>
+                            updateOHLC(symbol, '5', 300000)
+                        )
+                    );
                     await runSearchSignal_for_5m(300000);
+                } else {
+                    await priceTracker.start();
+                }
+            });
+        }
+
+        if (m % 15 === 0 && symbolUnique_15m.length > 0) {
+            jobQueue.push(async () => {
+                if (priceTracker.ws && priceTracker.ws.readyState === 1) {
+                    await Promise.all(
+                        symbolUnique_15m.map((symbol) =>
+                            updateOHLC(symbol, '15', 900000)
+                        )
+                    );
+                    await runSearchSignal_for_15m(900000);
                 } else {
                     await priceTracker.start();
                 }

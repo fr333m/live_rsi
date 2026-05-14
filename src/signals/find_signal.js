@@ -11,18 +11,11 @@ const dbService = new PostgresDB();
 
 async function findSignal(symbol, interval, currentTime) {
     try {
-        const peaks =
-            (await getPeaksPriceContracts(symbol, interval, currentTime)) ?? [];
-        const minima =
-            (await getMinimaPeaksPriceContracts(
-                symbol,
-                interval,
-                currentTime
-            )) ?? [];
-        const permissibleRange = await dbService.gettracking_contracts(
-            symbol,
-            interval
-        );
+        // Волна 1: Загружаем критичные данные (последние цены + пермиссибл рейндж)
+        const [lastpriceData, permissibleRange] = await Promise.all([
+            dbService.getLastMinutePrices(symbol, currentTime),
+            dbService.gettracking_contracts(symbol, interval),
+        ]);
 
         if (!permissibleRange || permissibleRange.length === 0) {
             console.log(
@@ -30,67 +23,104 @@ async function findSignal(symbol, interval, currentTime) {
             );
             return null;
         }
-        const volatility = permissibleRange[0].volatility;
-
-        const lastpriceData = await dbService.getLastMinutePrices(
-            symbol,
-            currentTime
-        );
         if (lastpriceData.length === 0) {
             console.log('Нет данных о последней цене для символа:', symbol);
             return null;
         }
 
+        const volatility = permissibleRange[0].volatility;
         const lastprice = lastpriceData[lastpriceData.length - 1].lastprice;
         console.log('Последняя цена:', lastprice);
-        // Проверка пиков (double top) — сигнал на продажу
-        for (const peak of peaks) {
+
+        // Волна 2: Загружаем пики и минимумы (после получения нужной инфы)
+        const [peaks, minima] = await Promise.all([
+            getPeaksPriceContracts(symbol, interval, currentTime),
+            getMinimaPeaksPriceContracts(symbol, interval, currentTime),
+        ]);
+
+        const peaksFiltered = peaks ?? [];
+        const minimaFiltered = minima ?? [];
+
+        console.log('Последняя цена:', lastprice);
+
+        // PEAKS
+        const peakPromises = peaksFiltered.map(async (peak) => {
             const priceDiffPercent =
                 Math.abs((peak.closePrice - lastprice) / lastprice) * 100;
-            if (priceDiffPercent <= volatility) {
-                const isActual = await checkActualSignal(
+
+            if (priceDiffPercent > volatility) {
+                return false;
+            }
+
+            const isActual = await checkActualSignal(
+                symbol,
+                interval,
+                lastpriceData[lastpriceData.length - 1].timestamp,
+                'double_top',
+                peak.timestamp
+            );
+
+            if (isActual === true) {
+                await sendSignal(
                     symbol,
                     interval,
-                    lastpriceData[lastpriceData.length - 1].timestamp,
-                    'double_top',
-                    peak.timestamp
+                    'Сигнал на продажу (Peak Detected)',
+                    peak.dateTime,
+                    {
+                        extra: 'extra_peaks',
+                        peak,
+                    }
                 );
-                if (isActual === true) {
-                    await sendSignal(
-                        symbol,
-                        interval,
-                        'Сигнал на продажу (Peak Detected)',
-                        peak.dateTime,
-                        { extra: 'extra_peaks', peak }
-                    );
-                    return true; // отправлен сигнал, завершаем функцию
-                }
-            }
-        }
 
-        // Проверка минимумов (double bottom) — сигнал на покупку
-        for (const minimum of minima) {
+                return true;
+            }
+
+            return false;
+        });
+
+        // MINIMA
+        const minimaPromises = minimaFiltered.map(async (minimum) => {
             const priceDiffPercent =
                 Math.abs((minimum.closePrice - lastprice) / lastprice) * 100;
-            if (priceDiffPercent <= volatility) {
-                const isActual = await checkActualSignal(
+
+            if (priceDiffPercent > volatility) {
+                return false;
+            }
+
+            const isActual = await checkActualSignal(
+                symbol,
+                interval,
+                lastpriceData[lastpriceData.length - 1].timestamp,
+                'double_bottom',
+                minimum.timestamp
+            );
+
+            if (isActual === true) {
+                await sendSignal(
                     symbol,
                     interval,
-                    lastpriceData[lastpriceData.length - 1].timestamp,
-                    'double_bottom',
-                    minimum.timestamp
+                    'Сигнал на покупку (Minimum Detected)',
+                    minimum.dateTime,
+                    {
+                        extra: 'extra_minima',
+                        minimum,
+                    }
                 );
-                if (isActual === true) {
-                    await sendSignal(
-                        symbol,
-                        interval,
-                        'Сигнал на покупку (Minimum Detected)',
-                        minimum.dateTime,
-                        { extra: 'extra_minima', minimum }
-                    );
-                    return true;
-                }
+
+                return true;
             }
+
+            return false;
+        });
+
+        // Выполняем одновременно
+        const [peakResults, minimaResults] = await Promise.all([
+            Promise.all(peakPromises),
+            Promise.all(minimaPromises),
+        ]);
+
+        if (peakResults.includes(true) || minimaResults.includes(true)) {
+            return true;
         }
 
         return false; // сигналов не найдено
@@ -99,51 +129,6 @@ async function findSignal(symbol, interval, currentTime) {
         return null;
     }
 }
-
-// async function findSignal(symbol, interval) {
-//     let typeSignal;
-//     let actualsSignal;
-//     const peaks = await getPeaksPriceContracts(symbol, interval);
-//     const minima = await getMinimaPeaksPriceContracts(symbol, interval);
-//     const permissibleRange = await dbService.gettracking_contracts(symbol, interval); // 1% от текущей цены
-
-//     const lastpriceData = await dbService.getLivePricesBySymbol(symbol);
-
-//     if (lastpriceData.length === 0) {
-//         console.log('Нет данных о последней цене для символа:', symbol);
-//         return null;
-//     }
-
-//     const lastprice = lastpriceData[lastpriceData.length - 1].lastprice;
-//     console.log('Последняя цена:', lastprice);
-
-//     for (const peak of peaks) {
-//         typeSignal = 'double_top'
-
-//         const priceDiffPercent = Math.abs((peak.closePrice - lastprice) / lastprice) * 100;
-
-//         if (priceDiffPercent <= permissibleRange[0].volatility) {
-//             actualsSignal = checkActualSignal(symbol, interval, peak.timestamp, typeSignal);
-//             if(actualsSignal === true){
-//                 await sendSignal(symbol, interval, 'Сигнал на продажу (Peak Detected)');
-//             }
-//         }
-//     }
-
-//     for (const minimum of minima) {
-//         typeSignal = 'double_bottom';
-
-//         const priceDiffPercent = Math.abs((minimum.closePrice - lastprice) / lastprice) * 100;
-
-//         if (priceDiffPercent <= permissibleRange[0].volatility) {
-//             actualsSignal = checkActualSignal(symbol, interval, minimum.timestamp, typeSignal);
-//             if(actualsSignal === true){
-//                 await sendSignal(symbol, interval, 'Сигнал на покупку (Minimum Detected)');
-//             }
-//         }
-//     }
-
-// }
 
 module.exports = {
     findSignal,

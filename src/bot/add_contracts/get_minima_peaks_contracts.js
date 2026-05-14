@@ -11,7 +11,7 @@ async function getMinimaPeaksPriceContracts(symbol, interval, currentTime) {
         'tracking_contracts',
         limit
     );
-    const ohlcSlice = ohlcData.slice(0, ohlcData.length - 3);
+    const ohlcSlice = ohlcData.slice(0, ohlcData.length - 10);
 
     if (ohlcData.length === 0) {
         return [];
@@ -20,7 +20,7 @@ async function getMinimaPeaksPriceContracts(symbol, interval, currentTime) {
     const peaks = await findMinima(ohlcSlice, symbol, currentTime);
 
     // await dbService.saveFilteredMinimum(symbol, interval, peaks);
-    console.log(peaks, 'FOR MIMIMA', symbol);
+    console.log(peaks, 'FOR MINIMA', symbol);
     return peaks;
 }
 

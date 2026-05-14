@@ -24,7 +24,7 @@ async function findMinima(candles, symbol, currentTime) {
         currentPriceData[currentPriceData.length - 1].lastprice;
     // console.log(`Текущая цена: ${currentPrice}`);
 
-    const windowSize = 5;
+    const windowSize = 10;
     const allLocalMins = [];
 
     // console.log(`\n=== Поиск локальных минимумов (window = ${windowSize}) ===`);

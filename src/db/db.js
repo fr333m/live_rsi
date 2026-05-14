@@ -14,22 +14,47 @@ class PostgresDB {
             database: process.env.DB_NAME,
             password: process.env.DB_PASSWORD,
             port: process.env.DB_PORT,
-            max: 20,
+            max: 35, // Снижено до 35 для стабильности
+            min: 2, // Минимум свободных соединений
+            idleTimeoutMillis: 60000, // Закрыть неиспользуемое через 60сек
+            connectionTimeoutMillis: 10000, // Таймаут подключения 10сек
+            statement_timeout: 30000, // Таймаут запроса 30 сек
         });
     }
 
     /**
-     * Execute a query using a pooled connection.
+     * Execute a query using a pooled connection with retry logic.
      * @param {string} text - SQL query
      * @param {Array} params - Query parameters
+     * @param {number} retries - Number of retry attempts
      */
-    async query(text, params = []) {
-        const client = await this.pool.connect();
-        try {
-            return await client.query(text, params);
-        } finally {
-            client.release();
+    async query(text, params = [], retries = 5) {
+        let lastError;
+        for (let i = 0; i < retries; i++) {
+            try {
+                const client = await this.pool.connect();
+                try {
+                    return await client.query(text, params);
+                } finally {
+                    client.release();
+                }
+            } catch (err) {
+                lastError = err;
+                // Retry on connection errors
+                if (
+                    (err.code === 'ECONNRESET' ||
+                        err.code === 'ETIMEDOUT' ||
+                        err.code === '53300') &&
+                    i < retries - 1
+                ) {
+                    const delay = Math.pow(2, i) * 150; // Экспоненциальная задержка: 150ms, 300ms, 600ms, 1200ms, 2400ms
+                    await new Promise((resolve) => setTimeout(resolve, delay));
+                    continue;
+                }
+                throw err;
+            }
         }
+        throw lastError;
     }
 
     /**
@@ -766,7 +791,7 @@ class PostgresDB {
             `SELECT COUNT(*) AS total FROM live_prices`
         );
         const total = parseInt(res.rows[0].total, 10);
-        if (total < 500_000) return;
+        if (total < 1500_000) return;
 
         await this.query(
             `
@@ -777,11 +802,11 @@ class PostgresDB {
       LIMIT $1
     )
   `,
-            [total - 100_000]
+            [total - 500_000]
         );
 
         console.log(
-            `[cleanup] Удалено ${total - 100_000} старых записей, осталось 100k`
+            `[cleanup] Удалено ${total - 500_000} старых записей, осталось 500k`
         );
     }
 

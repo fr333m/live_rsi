@@ -10,7 +10,7 @@ async function runSearchSignal_for_1m(currentTime) {
 
     if (symbolUnique_1m.length > 0) {
         for (const symbol of symbolUnique_1m) {
-            findSignal(symbol, '1', currentTime);
+            await findSignal(symbol, '1', currentTime);
         }
     }
 }
@@ -23,7 +23,20 @@ async function runSearchSignal_for_5m(currentTime) {
 
     if (symbolUnique_5m.length > 0) {
         for (const symbol of symbolUnique_5m) {
-            findSignal(symbol, '5', currentTime);
+            await findSignal(symbol, '5', currentTime);
+        }
+    }
+}
+
+async function runSearchSignal_for_15m(currentTime) {
+    const symbolUnique_15m = await dbService.uniqueSymbol(
+        'tracking_contracts',
+        '15'
+    );
+
+    if (symbolUnique_15m.length > 0) {
+        for (const symbol of symbolUnique_15m) {
+            await findSignal(symbol, '15', currentTime);
         }
     }
 }
@@ -31,4 +44,5 @@ async function runSearchSignal_for_5m(currentTime) {
 module.exports = {
     runSearchSignal_for_1m,
     runSearchSignal_for_5m,
+    runSearchSignal_for_15m,
 };

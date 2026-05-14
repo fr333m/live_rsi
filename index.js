@@ -17,6 +17,7 @@ const {
 const { findSignal } = require('./src/signals/find_signal');
 const { runSearchSignal } = require('./src/signals/run_search_signal');
 const priceCache = require('./src/ws/priceCache');
+const { getVolatilityLevel } = require('./src/signals/rsi/getVolatilityLevel');
 
 async function postgresInit() {
     await dbService.init();
@@ -27,8 +28,19 @@ async function printTable() {
     // const lastpriceData = priceCache.getLast('SOLUSDT');
     // const lastprice = lastpriceData.lastprice;
     // const candles = await dbService.printTable('tracking_contracts', 600);
-    const lastPrice = await getPeaksPriceContracts('SOLUSDT', '5', 300000);
+    const lastPrice = await getMinimaPeaksPriceContracts(
+        'SOLUSDT',
+        '5',
+        300000
+    );
+    // const ohlcData = await dbService.getCandles(
+    //     'DOGEUSDT',
+    //     '5',
+    //     'tracking_contracts',
+    //     300000
+    // );
     console.log(lastPrice);
+    // console.log(ohlcData);
     // const row = await dbService.checkRowForTypeSignal('ADAUSDT', '1', 'double_top', 'control_send_signal', 1778591460000);
     // console.log(typeof row.timestamp);
 
@@ -38,11 +50,24 @@ async function printTable() {
     // const lastpriceData = await dbService.getLivePricesBySymbol('LABUSDT');
     //  console.log(lastpriceData);
 }
-printTable();
+// printTable();
 
-async function test() {
-    await priceTracker.start();
-}
+// async function test() {
+//     const uniqueSymbols = await dbService.uniqueSymbol('tracking_contracts');
+
+//     for (const symbol of uniqueSymbols) {
+//         const candles = await dbService.getCandles(
+//             symbol,
+//             '5',
+//             'tracking_contracts',
+//             300
+//         );
+//         const volatilityLevel = getVolatilityLevel(candles);
+//         console.log(
+//             `[${symbol}] Уровень волатильности: ${volatilityLevel.volatilityPercent}`
+//         );
+//     }
+// }
 // test();
 
 startAlignedScheduler();

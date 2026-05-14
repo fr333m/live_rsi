@@ -169,11 +169,7 @@ class BybitPriceTracker extends EventEmitter {
     }
 
     // Очистить livePrices для удаленных символов
-    async _cleanupOldSymbols() {
-        const currentSymbols = new Set(
-            await dbService.uniqueSymbol('tracking_contracts')
-        );
-
+    _cleanupOldSymbols(currentSymbols) {
         for (const symbol of this.livePrices.keys()) {
             if (!currentSymbols.has(symbol)) {
                 this.livePrices.delete(symbol);
@@ -194,11 +190,12 @@ class BybitPriceTracker extends EventEmitter {
                 return;
             }
 
-            // Очищаем livePrices от удаленных символов
-            await this._cleanupOldSymbols();
+            // Очищаем livePrices от удаленных символов (передаем список контрактов)
+            const currentSymbols = new Set(contracts);
+            this._cleanupOldSymbols(currentSymbols);
 
             // Обновляем подписки
-            this.subscribedSymbols = new Set(contracts);
+            this.subscribedSymbols = currentSymbols;
             console.log(
                 `🔄 Обновлены подписки. Отслеживаем ${contracts.length} символов`
             );
