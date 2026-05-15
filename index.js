@@ -27,19 +27,22 @@ postgresInit();
 async function printTable() {
     // const lastpriceData = priceCache.getLast('SOLUSDT');
     // const lastprice = lastpriceData.lastprice;
-    // const candles = await dbService.printTable('tracking_contracts', 600);
-    const lastPrice = await getMinimaPeaksPriceContracts(
-        'SOLUSDT',
-        '5',
-        300000
+    const candles = await dbService.getRowsByInterval(
+        '15',
+        'all_contracts_tracking'
     );
+    // const lastPrice = await getMinimaPeaksPriceContracts(
+    //     'SOLUSDT',
+    //     '5',
+    //     300000
+    // );
     // const ohlcData = await dbService.getCandles(
     //     'DOGEUSDT',
     //     '5',
     //     'tracking_contracts',
     //     300000
     // );
-    console.log(lastPrice);
+    // console.log(candles.length);
     // console.log(ohlcData);
     // const row = await dbService.checkRowForTypeSignal('ADAUSDT', '1', 'double_top', 'control_send_signal', 1778591460000);
     // console.log(typeof row.timestamp);
@@ -50,7 +53,7 @@ async function printTable() {
     // const lastpriceData = await dbService.getLivePricesBySymbol('LABUSDT');
     //  console.log(lastpriceData);
 }
-// printTable();
+printTable();
 
 // async function test() {
 //     const uniqueSymbols = await dbService.uniqueSymbol('tracking_contracts');

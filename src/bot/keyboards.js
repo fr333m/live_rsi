@@ -1,44 +1,49 @@
 const { Markup } = require('telegraf');
 
-// Создание клавиатуры с кнопками для выбора контракта
-const getContractsKeyboard = (contracts) => {
-  const buttons = contracts.map((contract) =>
-    Markup.button.callback(
-      contract.symbol,
-      `symbol_${contract.symbol}`
-    )
-  );
+/**
+ * Клавиатура для выбора контракта
+ * @param {Array} contracts - массив контрактов
+ * @param {string} mode - 'add' или 'delete' (для разных действий)
+ */
+const getContractsKeyboard = (contracts, mode = 'add') => {
+    const prefix = mode === 'delete' ? 'symbol_delete_' : 'symbol_add_';
 
-  // Разделяем кнопки по 2 в ряду
-  const keyboard = [];
-  for (let i = 0; i < buttons.length; i += 2) {
-    keyboard.push(buttons.slice(i, i + 2));
-  }
+    const buttons = contracts.map((contract) =>
+        Markup.button.callback(contract.symbol, `${prefix}${contract.symbol}`)
+    );
 
-  return Markup.inlineKeyboard(keyboard);
+    // Кнопки по 2 в ряд
+    const keyboard = [];
+    for (let i = 0; i < buttons.length; i += 2) {
+        keyboard.push(buttons.slice(i, i + 2));
+    }
+
+    return Markup.inlineKeyboard(keyboard);
 };
 
-// Создание клавиатуры с интервалами
-const getIntervalsKeyboard = () => {
-  const intervals = ['1', '5', '15', '30', '1h', '4h'];
-  
-  const buttons = intervals.map((interval) =>
-    Markup.button.callback(
-      interval,
-      `interval_${interval}`
-    )
-  );
+/**
+ * Клавиатура для выбора таймфрейма
+ * @param {string} mode - 'add' или 'delete'
+ */
+const getIntervalsKeyboard = (mode = 'add') => {
+    const prefix = mode === 'delete' ? 'interval_delete_' : 'interval_add_';
 
-  // Разделяем кнопки по 3 в ряду
-  const keyboard = [];
-  for (let i = 0; i < buttons.length; i += 3) {
-    keyboard.push(buttons.slice(i, i + 3));
-  }
+    const intervals = ['1', '5', '15', '30', '1h', '4h'];
 
-  return Markup.inlineKeyboard(keyboard);
+    const buttons = intervals.map((interval) =>
+        Markup.button.callback(interval, `${prefix}${interval}`)
+    );
+
+    // Кнопки по 3 в ряд
+    const keyboard = [];
+    for (let i = 0; i < buttons.length; i += 3) {
+        keyboard.push(buttons.slice(i, i + 3));
+    }
+
+    return Markup.inlineKeyboard(keyboard);
 };
 
 module.exports = {
-  getContractsKeyboard,
-  getIntervalsKeyboard
+    getContractsKeyboard,
+    getIntervalsKeyboard,
 };

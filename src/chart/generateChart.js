@@ -233,83 +233,57 @@ function createPriceLinePlugin(lastPrice) {
 }
 
 function createExtraLevelPlugin(ohlcData, extraData) {
+    console.log('Генерация графика с extraData:', extraData);
     return {
         id: 'extraLevel',
         afterDraw(chart) {
             const peak = extraData?.peak;
-            if (!peak?.index) return;
+
+            // Исправленная проверка — не падает на index === 0
+            if (!peak || peak.index == null) return;
 
             const index = peak.index;
             if (index < 0 || index >= ohlcData.length) return;
 
-            const candle = ohlcData[index];
-            const isPeak = extraData.extra === 'extra_peaks';
-            const color = isPeak ? '#ef4444' : '#22c55e';
-            const levelPrice = isPeak ? peak.highPrice : peak.lowPrice;
+            // Определяем тип уровня из extraData.extra
+            const isPeak = extraData.extra === 'peak';
+            const isMin = extraData.extra === 'minimum';
+
+            let levelPrice;
+            let color;
+
+            if (isPeak && peak.highPrice) {
+                levelPrice = peak.highPrice;
+                color = '#ef4444'; // красный для максимумов
+            } else if (isMin && peak.lowPrice) {
+                levelPrice = peak.lowPrice;
+                color = '#22c55e'; // зелёный для минимумов
+            } else {
+                return;
+            }
 
             const {
                 ctx,
-                scales: { x, y },
+                scales: { y },
                 width,
-                height,
             } = chart;
-            const xPos = x.getPixelForValue(index);
             const yPos = y.getPixelForValue(levelPrice);
+
+            if (!Number.isFinite(yPos) || yPos < 0 || yPos > chart.height)
+                return;
 
             ctx.save();
             ctx.strokeStyle = color;
-            ctx.lineWidth = 2.5;
-            ctx.setLineDash([8, 5]);
+            ctx.lineWidth = 2.8;
+            ctx.setLineDash([6, 4]);
 
-            // Горизонтальная линия
             ctx.beginPath();
             ctx.moveTo(0, yPos);
             ctx.lineTo(width, yPos);
             ctx.stroke();
 
-            // Вертикальная линия
-            ctx.beginPath();
-            ctx.moveTo(xPos, 0);
-            ctx.lineTo(xPos, height);
-            ctx.stroke();
-
-            // Label
-            const label = isPeak
-                ? `PEAK ${levelPrice.toFixed(4)}`
-                : `MIN ${levelPrice.toFixed(4)}`;
-            ctx.font = 'bold 18px Arial';
-            ctx.textAlign = 'left';
-
-            const textWidth = ctx.measureText(label).width;
-            const padding = 12;
-            const boxX = width - textWidth - padding * 2 - 20;
-            const boxY = yPos - 18;
-
             ctx.fillStyle = color;
-            ctx.fillRect(boxX, boxY, textWidth + padding * 2, 36);
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText(label, boxX + padding, boxY + 26);
-
-            // Выделение свечи
-            ctx.lineWidth = 3.5;
-            ctx.setLineDash([]);
-
-            const highY = y.getPixelForValue(candle.high);
-            const lowY = y.getPixelForValue(candle.low);
-            const openY = y.getPixelForValue(candle.open);
-            const closeY = y.getPixelForValue(candle.close);
-
-            ctx.beginPath();
-            ctx.moveTo(xPos, highY);
-            ctx.lineTo(xPos, lowY);
-            ctx.stroke();
-
-            ctx.fillStyle = color;
-            const bodyTop = Math.min(openY, closeY);
-            const bodyHeight = Math.max(Math.abs(openY - closeY), 3);
-
-            ctx.fillRect(xPos - 9, bodyTop, 18, bodyHeight);
+            ctx.fillRect(8, yPos - 4, 6, 8);
 
             ctx.restore();
         },

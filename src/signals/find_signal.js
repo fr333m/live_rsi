@@ -67,7 +67,7 @@ async function findSignal(symbol, interval, currentTime) {
                     'Сигнал на продажу (Peak Detected)',
                     peak.dateTime,
                     {
-                        extra: 'extra_peaks',
+                        extra: 'peak',
                         peak,
                     }
                 );
@@ -79,9 +79,9 @@ async function findSignal(symbol, interval, currentTime) {
         });
 
         // MINIMA
-        const minimaPromises = minimaFiltered.map(async (minimum) => {
+        const minimaPromises = minimaFiltered.map(async (peak) => {
             const priceDiffPercent =
-                Math.abs((minimum.closePrice - lastprice) / lastprice) * 100;
+                Math.abs((peak.closePrice - lastprice) / lastprice) * 100;
 
             if (priceDiffPercent > volatility) {
                 return false;
@@ -92,7 +92,7 @@ async function findSignal(symbol, interval, currentTime) {
                 interval,
                 lastpriceData[lastpriceData.length - 1].timestamp,
                 'double_bottom',
-                minimum.timestamp
+                peak.timestamp
             );
 
             if (isActual === true) {
@@ -100,10 +100,10 @@ async function findSignal(symbol, interval, currentTime) {
                     symbol,
                     interval,
                     'Сигнал на покупку (Minimum Detected)',
-                    minimum.dateTime,
+                    peak.dateTime,
                     {
-                        extra: 'extra_minima',
-                        minimum,
+                        extra: 'minimum',
+                        peak,
                     }
                 );
 
