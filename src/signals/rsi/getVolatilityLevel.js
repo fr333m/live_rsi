@@ -47,19 +47,19 @@ function getVolatilityLevel(candles, period = 50) {
     if (volatilityPercent < 0.5) {
         level = 'очень низкий';
         description = 'Очень спокойный рынок';
-        volatilityForSignal = 0.4;
+        volatilityForSignal = 0.3;
     } else if (volatilityPercent < 0.8) {
         level = 'низкий';
         description = 'Спокойный рынок';
-        volatilityForSignal = 0.8;
+        volatilityForSignal = 0.5;
     } else if (volatilityPercent < 1.2) {
         level = 'средний';
         description = 'Нормальная волатильность';
-        volatilityForSignal = 1.1;
+        volatilityForSignal = 1.0;
     } else if (volatilityPercent < 2.0) {
         level = 'высокий';
         description = 'Повышенная волатильность';
-        volatilityForSignal = 2;
+        volatilityForSignal = 2.0;
     } else {
         level = 'очень высокий';
         description = 'Экстремальная волатильность';

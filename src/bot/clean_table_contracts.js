@@ -11,7 +11,7 @@ const cleanTableContracts = async (ctx) => {
         await dbService.removeDataTable('control_send_signal');
         await dbService.removeDataTable('tracking_contracts');
         await dbService.removeDataTable('live_prices');
-        await priceTracker.refreshSubscriptions();
+        await priceTracker.reload();
         await ctx.reply(`✅ Таблица all_contracts_tracking успешно очищена!`);
     } catch (error) {
         console.error('Ошибка в cleanTableContracts:', error);
