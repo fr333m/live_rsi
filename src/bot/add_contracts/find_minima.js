@@ -20,7 +20,7 @@ async function findMinima(candles, symbol) {
     const currentPrice = lastRecord.lastPrice;
     // console.log(`Текущая цена: ${currentPrice}`);
 
-    const windowSize = 10;
+    const windowSize = 20;
     const allLocalMins = [];
 
     // console.log(`\n=== Поиск локальных минимумов (window = ${windowSize}) ===`);

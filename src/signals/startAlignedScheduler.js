@@ -5,16 +5,19 @@ const priceTracker = require('../ws/wsClient');
 const { calculationRSI } = require('./rsi/rsi');
 const { saveLivePrice } = require('./save_live_price');
 const extremumCache = require('../ws/extremumCache');
+const { updateRSIfromCache } = require('./updateRSIcache');
 const {
     runSearchSignal_for_1m,
     runSearchSignal_for_5m,
     runSearchSignal_for_15m,
+    runSearchSignal_for_60m,
 } = require('./run_search_signal');
 
 const {
     runUpdateExtremum_for_1m,
     runUpdateExtremum_for_5m,
     runUpdateExtremum_for_15m,
+    runUpdateExtremum_for_60m,
 } = require('./update_extremum_on_cache');
 
 let isQueueRunning = false;
@@ -57,13 +60,17 @@ function startAlignedScheduler() {
     }
 
     async function onTick() {
-        let type = '';
-        const [symbolUnique_1m, symbolUnique_5m, symbolUnique_15m] =
-            await Promise.all([
-                dbService.uniqueSymbol('tracking_contracts', '1'),
-                dbService.uniqueSymbol('tracking_contracts', '5'),
-                dbService.uniqueSymbol('tracking_contracts', '15'),
-            ]);
+        const [
+            symbolUnique_1m,
+            symbolUnique_5m,
+            symbolUnique_15m,
+            symbolUnique_60m,
+        ] = await Promise.all([
+            dbService.uniqueSymbol('tracking_contracts', '1'),
+            dbService.uniqueSymbol('tracking_contracts', '5'),
+            dbService.uniqueSymbol('tracking_contracts', '15'),
+            dbService.uniqueSymbol('tracking_contracts', '60'),
+        ]);
         const now = new Date();
         const m = now.getMinutes();
 
@@ -82,6 +89,7 @@ function startAlignedScheduler() {
                         )
                     );
                     await runUpdateExtremum_for_1m();
+                    await updateRSIfromCache('1');
 
                     console.log(
                         'Updated extremum for 1m:',
@@ -103,6 +111,7 @@ function startAlignedScheduler() {
                         )
                     );
                     await runUpdateExtremum_for_5m();
+                    await updateRSIfromCache('5');
                 } else {
                     await priceTracker.start();
                 }
@@ -118,6 +127,23 @@ function startAlignedScheduler() {
                         )
                     );
                     await runUpdateExtremum_for_15m();
+                    await updateRSIfromCache('15');
+                } else {
+                    await priceTracker.start();
+                }
+            });
+        }
+
+        if (m % 60 === 0 && symbolUnique_60m.length > 0) {
+            jobQueue.push(async () => {
+                if (priceTracker.ws && priceTracker.ws.readyState === 1) {
+                    await Promise.all(
+                        symbolUnique_60m.map((symbol) =>
+                            updateOHLC(symbol, '1h', 3600000)
+                        )
+                    );
+                    await runUpdateExtremum_for_60m();
+                    await updateRSIfromCache('60');
                 } else {
                     await priceTracker.start();
                 }
@@ -153,6 +179,9 @@ setInterval(async () => {
             ),
             runSearchSignal_for_15m(now).catch((err) =>
                 console.error('15m error:', err)
+            ),
+            runSearchSignal_for_60m(now).catch((err) =>
+                console.error('60m error:', err)
             ),
         ];
 

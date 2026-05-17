@@ -66,7 +66,7 @@ printTable();
 // }
 // test();
 
-// startAlignedScheduler();
+startAlignedScheduler();
 
 console.log('🚀 Запуск бота...');
 

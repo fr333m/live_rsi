@@ -28,7 +28,7 @@ const getContractsKeyboard = (contracts, mode = 'add') => {
 const getIntervalsKeyboard = (mode = 'add') => {
     const prefix = mode === 'delete' ? 'interval_delete_' : 'interval_add_';
 
-    const intervals = ['1', '5', '15', '30', '1h', '4h'];
+    const intervals = ['1', '5', '15', '30', '60', '240'];
 
     const buttons = intervals.map((interval) =>
         Markup.button.callback(interval, `${prefix}${interval}`)

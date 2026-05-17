@@ -73,8 +73,29 @@ async function runUpdateExtremum_for_15m() {
     return true;
 }
 
+async function runUpdateExtremum_for_60m() {
+    const symbolUnique_60m = await dbService.uniqueSymbol(
+        'tracking_contracts',
+        '60'
+    );
+
+    if (symbolUnique_60m.length > 0) {
+        extremumCache.removeAllByInterval('60');
+        for (const symbol of symbolUnique_60m) {
+            const minima = await getMinimaPeaksPriceContracts(symbol, '60');
+            const peaks = await getPeaksPriceContracts(symbol, '60');
+
+            extremumCache.set(symbol, '60', minima, 'min_extremum');
+            extremumCache.set(symbol, '60', peaks, 'max_extremum');
+            console.log(`Обновленные экстремумы для ${symbol} на 1 час:`);
+        }
+    }
+
+    return true;
+}
 module.exports = {
     runUpdateExtremum_for_1m,
     runUpdateExtremum_for_5m,
     runUpdateExtremum_for_15m,
+    runUpdateExtremum_for_60m,
 };

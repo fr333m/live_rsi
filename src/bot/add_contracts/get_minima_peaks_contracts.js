@@ -16,7 +16,7 @@ async function getMinimaPeaksPriceContracts(symbol, interval) {
     //     return [];
     // }
 
-    const peaks = await findMinima(ohlcData, symbol);
+    const peaks = await findMinima(ohlcData, symbol, interval);
 
     // await dbService.saveFilteredMinimum(symbol, interval, peaks);
     // console.log(peaks, 'FOR MINIMA', symbol);

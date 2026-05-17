@@ -4,8 +4,11 @@ const PostgresDB = require('../../src/db/db');
 const dbService = new PostgresDB();
 const priceTracker = require('../ws/wsClient');
 const extremumCache = require('../ws/extremumCache');
+const rsiCache = require('../ws/cacheRSI');
 
 async function findSignal(symbol, interval) {
+    const rsiValue = rsiCache.get(symbol, interval);
+
     try {
         // ==================== 1. Загрузка данных ====================
         const [trackingData] = await Promise.all([
@@ -50,6 +53,10 @@ async function findSignal(symbol, interval) {
             const priceDiffPercent =
                 Math.abs((extremum.closePrice - lastprice) / lastprice) * 100;
 
+            if (rsiValue !== null) {
+                if (rsiValue.rsi < 65 && type === 'peak') return false;
+                if (rsiValue.rsi > 35 && type === 'minimum') return false;
+            }
             if (priceDiffPercent > volatility) return false;
             if (lastprice > extremum.closePrice && type === 'peak')
                 return false;
@@ -79,7 +86,8 @@ async function findSignal(symbol, interval) {
                     {
                         extra: type,
                         [type]: extremum, // peak или minimum
-                    }
+                    },
+                    rsiValue.rsi
                 );
 
                 // Удаляем использованный экстремум

@@ -12,7 +12,7 @@ const PostgresDB = require('../../../db/db');
 const dbService = new PostgresDB();
 
 const SYMBOL_REGEX = /^[A-Z0-9]{2,}USDT$/;
-const INTERVAL_REGEX = /^(\d+|1|5|15|30)(m|h|d|w)?$/i;
+const INTERVAL_REGEX = /^(\d+|1|5|15|30|60|240)(m|h|d|w)?$/i;
 
 const validateSymbol = (text) => {
     const symbol = text.toUpperCase();
@@ -30,7 +30,7 @@ const validateInterval = (text) => {
     if (!INTERVAL_REGEX.test(interval)) {
         return {
             isValid: false,
-            error: 'Некорректный таймфрейм. Используйте формат 5m, 15m, 1h, 4h.',
+            error: 'Некорректный таймфрейм. Используйте формат 5, 15, 60, 240.',
         };
     }
     return { isValid: true, value: interval };

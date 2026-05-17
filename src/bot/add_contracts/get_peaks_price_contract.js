@@ -16,7 +16,7 @@ async function getPeaksPriceContracts(symbol, interval) {
     //     return [];
     // }
 
-    const peaks = await findMaxima(ohlcData, symbol);
+    const peaks = await findMaxima(ohlcData, symbol, interval);
 
     // console.log(peaks, 'FOR', symbol);
     return peaks;

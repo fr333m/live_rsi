@@ -1,13 +1,12 @@
 const TelegramBot = require('node-telegram-bot-api');
 const config = require('../config/config');
 const { generateChart } = require('../chart/generateChart');
- // Убедись что путь правильный
+// Убедись что путь правильный
 
 const TELEGRAM_BOT_TOKEN = config.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = config.TELEGRAM_CHAT_ID;
 
 const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
-
 
 /**
  * Отправляет торговое оповещение RSI Top с графиком и кнопками действий
@@ -17,16 +16,17 @@ const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
  * @param {string} dataTime
  * @returns {Promise<object>}
  */
-async function sendSignal(symbol, interval, signalType, dataTime, extraData) {
-
+async function sendSignal(
+    symbol,
+    interval,
+    signalType,
+    dataTime,
+    extraData,
+    rsiValue
+) {
     try {
-
         // Генерация графика
-        const imageBuffer = await generateChart(
-            symbol,
-            interval,
-            extraData
-        );
+        const imageBuffer = await generateChart(symbol, interval, extraData);
 
         // Текст сообщения
         const messageText = `
@@ -36,6 +36,7 @@ async function sendSignal(symbol, interval, signalType, dataTime, extraData) {
 ⏱️ Таймфрейм: *${interval}*
 🔔 Сигнал: *${signalType}*
 ⏱️ Время: *${dataTime}*
+📊 RSI: *${rsiValue}*
 
 *Анализ показывает потенциальное движение вверх по этому инструменту.*
         `.trim();
@@ -46,24 +47,20 @@ async function sendSignal(symbol, interval, signalType, dataTime, extraData) {
                 [
                     {
                         text: `📈 ${symbol}`,
-                        url: `https://www.bybit.com/trade/usdt/${symbol}`
-                    }
-                ]
-            ]
+                        url: `https://www.bybit.com/trade/usdt/${symbol}`,
+                    },
+                ],
+            ],
         };
 
         // Отправка изображения с подписью
-        const result = await bot.sendPhoto(
-            TELEGRAM_CHAT_ID,
-            imageBuffer,
-            {
-                caption: messageText,
+        const result = await bot.sendPhoto(TELEGRAM_CHAT_ID, imageBuffer, {
+            caption: messageText,
 
-                parse_mode: 'Markdown',
+            parse_mode: 'Markdown',
 
-                reply_markup: keyboard
-            }
-        );
+            reply_markup: keyboard,
+        });
 
         console.log(
             `✅ Оповещение успешно отправлено для ${symbol} (${interval})`
@@ -74,11 +71,9 @@ async function sendSignal(symbol, interval, signalType, dataTime, extraData) {
             messageId: result.message_id,
             symbol,
             interval,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         };
-
     } catch (error) {
-
         console.error(
             `❌ Ошибка при отправке оповещения для ${symbol}:`,
             error.message
@@ -89,10 +84,9 @@ async function sendSignal(symbol, interval, signalType, dataTime, extraData) {
             error: error.message,
             symbol,
             interval,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         };
     }
 }
-
 
 module.exports = { sendSignal };

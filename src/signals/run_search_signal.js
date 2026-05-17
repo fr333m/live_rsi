@@ -41,8 +41,22 @@ async function runSearchSignal_for_15m(currentTime) {
     }
 }
 
+async function runSearchSignal_for_60m(currentTime) {
+    const symbolUnique_60m = await dbService.uniqueSymbol(
+        'tracking_contracts',
+        '60'
+    );
+
+    if (symbolUnique_60m.length > 0) {
+        for (const symbol of symbolUnique_60m) {
+            await findSignal(symbol, '60', currentTime);
+        }
+    }
+}
+
 module.exports = {
     runSearchSignal_for_1m,
     runSearchSignal_for_5m,
     runSearchSignal_for_15m,
+    runSearchSignal_for_60m,
 };

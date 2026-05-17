@@ -1,7 +1,7 @@
 const { formatShort } = require('./transform_timestamp');
 const priceTracker = require('../../ws/wsClient');
 
-async function findMaxima(candles, symbol) {
+async function findMaxima(candles, symbol, interval) {
     // console.log(`\n=== findMaxima START | ${symbol} | Свечей: ${candles.length} ===`);
 
     if (!candles || candles.length < 30) {
@@ -19,7 +19,7 @@ async function findMaxima(candles, symbol) {
 
     // console.log(`Текущая цена: ${currentPrice}`);
 
-    const windowSize = 10;
+    const windowSize = 10; // Больше свечей для 60м, меньше для 15м
     const allLocalMaxs = [];
 
     // // console.log(`\n=== Поиск локальных максимумов (window = ${windowSize}) ===`);
