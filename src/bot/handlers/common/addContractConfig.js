@@ -143,7 +143,7 @@ module.exports = {
                 },
             ]);
 
-            if (priceTracker.ws && priceTracker.ws.readyState === 1) {
+            if ({ priceTracker }.ws && priceTracker.ws.readyState === 1) {
                 logger.debug(
                     `[addContractConfig.finalAction] Перезагрузка ценового трекера`
                 );

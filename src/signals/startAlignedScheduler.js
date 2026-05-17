@@ -1,14 +1,21 @@
 const PostgresDB = require('../db/db');
 const dbService = new PostgresDB();
 const { updateOHLC } = require('./updateOHLC');
-const { priceTracker } = require('../ws/wsClient');
+const priceTracker = require('../ws/wsClient');
 const { calculationRSI } = require('./rsi/rsi');
 const { saveLivePrice } = require('./save_live_price');
+const extremumCache = require('../ws/extremumCache');
 const {
     runSearchSignal_for_1m,
     runSearchSignal_for_5m,
     runSearchSignal_for_15m,
 } = require('./run_search_signal');
+
+const {
+    runUpdateExtremum_for_1m,
+    runUpdateExtremum_for_5m,
+    runUpdateExtremum_for_15m,
+} = require('./update_extremum_on_cache');
 
 let isQueueRunning = false;
 const jobQueue = [];
@@ -74,7 +81,12 @@ function startAlignedScheduler() {
                             updateOHLC(symbol, '1', 60000)
                         )
                     );
-                    await runSearchSignal_for_1m(60000);
+                    await runUpdateExtremum_for_1m();
+
+                    console.log(
+                        'Updated extremum for 1m:',
+                        JSON.stringify(extremumCache.getAll().length)
+                    );
                 } else {
                     await priceTracker.start();
                 }
@@ -90,7 +102,7 @@ function startAlignedScheduler() {
                             updateOHLC(symbol, '5', 300000)
                         )
                     );
-                    await runSearchSignal_for_5m(300000);
+                    await runUpdateExtremum_for_5m();
                 } else {
                     await priceTracker.start();
                 }
@@ -105,7 +117,7 @@ function startAlignedScheduler() {
                             updateOHLC(symbol, '15', 900000)
                         )
                     );
-                    await runSearchSignal_for_15m(900000);
+                    await runUpdateExtremum_for_15m();
                 } else {
                     await priceTracker.start();
                 }
@@ -127,6 +139,26 @@ function startAlignedScheduler() {
 
     scheduleNextTick();
 }
+
+setInterval(async () => {
+    const now = Date.now();
+
+    if (priceTracker.ws && priceTracker.ws.readyState === 1) {
+        const tasks = [
+            runSearchSignal_for_1m(now).catch((err) =>
+                console.error('1m error:', err)
+            ),
+            runSearchSignal_for_5m(now).catch((err) =>
+                console.error('5m error:', err)
+            ),
+            runSearchSignal_for_15m(now).catch((err) =>
+                console.error('15m error:', err)
+            ),
+        ];
+
+        await Promise.all(tasks);
+    }
+}, 5000); // каждую 5 секунд проверяем сигналы для всех таймфреймов
 
 module.exports = {
     startAlignedScheduler,

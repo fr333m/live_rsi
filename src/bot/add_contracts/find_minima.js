@@ -1,9 +1,9 @@
 const { formatShort } = require('./transform_timestamp');
 const PostgresDB = require('../../../src/db/db');
 const dbService = new PostgresDB();
-const { getRsi } = require('../../signals/rsi/rsi_value');
+const priceTracker = require('../../ws/wsClient');
 
-async function findMinima(candles, symbol, currentTime) {
+async function findMinima(candles, symbol) {
     // console.log(`\n=== findMinima START | ${symbol} | Свечей: ${candles.length} ===`);
 
     if (!candles || candles.length < 30) {
@@ -11,17 +11,13 @@ async function findMinima(candles, symbol, currentTime) {
         return [];
     }
 
-    const currentPriceData = await dbService.getLastMinutePrices(
-        symbol,
-        currentTime
-    );
-    if (!currentPriceData?.length) {
-        // console.log("❌ Нет данных о текущей цене");
+    const lastRecord = priceTracker.getPrice(symbol)?.lastPrice;
+    if (!lastRecord) {
+        // console.log("❌ Нет данных цены в кэше для символа");
         return [];
     }
 
-    const currentPrice =
-        currentPriceData[currentPriceData.length - 1].lastprice;
+    const currentPrice = lastRecord.lastPrice;
     // console.log(`Текущая цена: ${currentPrice}`);
 
     const windowSize = 10;

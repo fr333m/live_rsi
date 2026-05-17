@@ -1,8 +1,7 @@
 const { formatShort } = require('./transform_timestamp');
-const PostgresDB = require('../../../src/db/db');
-const dbService = new PostgresDB();
+const priceTracker = require('../../ws/wsClient');
 
-async function findMaxima(candles, symbol, currentTime) {
+async function findMaxima(candles, symbol) {
     // console.log(`\n=== findMaxima START | ${symbol} | Свечей: ${candles.length} ===`);
 
     if (!candles || candles.length < 30) {
@@ -10,19 +9,17 @@ async function findMaxima(candles, symbol, currentTime) {
         return [];
     }
 
-    const currentPriceData = await dbService.getLastMinutePrices(
-        symbol,
-        currentTime
-    );
-    if (!currentPriceData?.length) {
-        // console.log("❌ Нет данных о текущей цене");
+    const lastRecord = priceTracker.getPrice(symbol)?.lastPrice;
+    if (!lastRecord) {
+        // console.log("❌ Нет данных цены в кэше для символа");
         return [];
     }
 
-    const currentPrice = currentPriceData[0].lastprice;
+    const currentPrice = lastRecord?.lastPrice;
+
     // console.log(`Текущая цена: ${currentPrice}`);
 
-    const windowSize = 5;
+    const windowSize = 10;
     const allLocalMaxs = [];
 
     // // console.log(`\n=== Поиск локальных максимумов (window = ${windowSize}) ===`);
@@ -75,7 +72,7 @@ async function findMaxima(candles, symbol, currentTime) {
 
         if (
             curr.highPrice > last.highPrice &&
-            diffPercent > 0.08 &&
+            diffPercent > 0.8 &&
             last.index - curr.index > 4
         ) {
             finalMaxima.push(curr);

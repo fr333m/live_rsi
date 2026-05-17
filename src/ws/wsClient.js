@@ -6,7 +6,7 @@ const { EventEmitter } = require('events');
 const priceCache = require('./priceCache');
 
 // ===================== НАСТРОЙКИ =====================
-class BybitPriceTracker extends EventEmitter {
+class BybitpriceTracker extends EventEmitter {
     constructor() {
         super();
         this.ws = null;
@@ -53,6 +53,7 @@ class BybitPriceTracker extends EventEmitter {
             console.log('🔌 Подключились к Bybit WebSocket');
             this.subscribe();
             this.isConnecting = false;
+            this.emit('open');
         });
 
         this.ws.on('message', (rawData) => {
@@ -147,6 +148,12 @@ class BybitPriceTracker extends EventEmitter {
                     console.log(
                         `📈 ${priceInfo.symbol} - Last: ${priceInfo.lastPrice}, Mark: ${priceInfo.markPrice}, Index: ${priceInfo.indexPrice}, ${priceInfo.timestamp}`
                     );
+                    console.log(
+                        'Последняя цена для',
+                        symbol,
+                        ':',
+                        priceTracker.getPrice(symbol).lastPrice
+                    );
                 }
             }
         } catch (err) {
@@ -178,34 +185,68 @@ class BybitPriceTracker extends EventEmitter {
         }
     }
 
+    async ensureConnected() {
+        if (this.isConnecting) return;
+
+        // Если соединения нет или оно закрыто
+        if (
+            !this.ws ||
+            this.ws.readyState === WebSocket.CLOSED ||
+            this.ws.readyState === WebSocket.CLOSING
+        ) {
+            console.log('🔄 WebSocket неактивен → запускаем start()');
+            await this.start();
+            await this.waitForOpen(4000);
+            return;
+        }
+
+        // Если соединение живое — просто обновляем подписку
+        console.log('🔄 Соединение живое → обновляем подписку');
+        await this.refreshSubscriptions();
+    }
+
+    async waitForOpen(timeout = 4000) {
+        return new Promise((resolve) => {
+            if (this.ws?.readyState === WebSocket.OPEN) return resolve(true);
+
+            const timeoutId = setTimeout(() => resolve(false), timeout);
+
+            this.once('open', () => {
+                clearTimeout(timeoutId);
+                resolve(true);
+            });
+        });
+    }
+
     // Если список контрактов в БД изменился — можно переподписаться
     async refreshSubscriptions() {
         try {
-            // Обновляем список подписанных символов из БД
             const contracts =
                 await dbService.uniqueSymbol('tracking_contracts');
 
             if (!Array.isArray(contracts) || contracts.length === 0) {
-                console.warn('❌ Нет контрактов для отслеживания');
+                console.warn('❌ Нет контрактов в tracking_contracts');
                 return;
             }
 
-            // Очищаем livePrices от удаленных символов (передаем список контрактов)
             const currentSymbols = new Set(contracts);
+
+            // Очистка старых данных
             this._cleanupOldSymbols(currentSymbols);
 
-            // Обновляем подписки
+            // Обновляем список
             this.subscribedSymbols = currentSymbols;
-            console.log(
-                `🔄 Обновлены подписки. Отслеживаем ${contracts.length} символов`
-            );
 
-            // Переподключаемся для применения новых подписок
+            console.log(`🔄 Обновлено подписок: ${contracts.length} символов`);
+
+            // Если соединение открыто — отправляем новую подписку
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                this.ws.close();
+                this.subscribe(); // повторная подписка
+            } else {
+                this.connect();
             }
         } catch (err) {
-            console.error('❌ Ошибка при обновлении подписок:', err.message);
+            console.error('❌ Ошибка refreshSubscriptions:', err);
         }
     }
 
@@ -251,6 +292,6 @@ class BybitPriceTracker extends EventEmitter {
 }
 
 // Создаём и экспортируем единственный экземпляр (Singleton)
-const priceTracker = new BybitPriceTracker();
+const priceTracker = new BybitpriceTracker();
 
-module.exports = { priceTracker };
+module.exports = priceTracker;

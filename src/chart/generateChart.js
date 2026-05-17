@@ -237,7 +237,7 @@ function createExtraLevelPlugin(ohlcData, extraData) {
     return {
         id: 'extraLevel',
         afterDraw(chart) {
-            const peak = extraData?.peak;
+            const peak = extraData?.peak ?? extraData?.minimum;
 
             // Исправленная проверка — не падает на index === 0
             if (!peak || peak.index == null) return;

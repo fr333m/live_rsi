@@ -1,9 +1,8 @@
 const { findMinima } = require('./find_minima');
-const { formatTimestamp } = require('./transform_timestamp');
 const PostgresDB = require('../../../src/db/db');
 const dbService = new PostgresDB();
 
-async function getMinimaPeaksPriceContracts(symbol, interval, currentTime) {
+async function getMinimaPeaksPriceContracts(symbol, interval) {
     const limit = 300;
     const ohlcData = await dbService.getCandles(
         symbol,
@@ -11,16 +10,16 @@ async function getMinimaPeaksPriceContracts(symbol, interval, currentTime) {
         'tracking_contracts',
         limit
     );
-    const ohlcSlice = ohlcData.slice(0, ohlcData.length - 10);
+    // const ohlcSlice = ohlcData.slice(0, ohlcData.length - 10);
 
-    if (ohlcData.length === 0) {
-        return [];
-    }
+    // if (ohlcData.length === 0) {
+    //     return [];
+    // }
 
-    const peaks = await findMinima(ohlcSlice, symbol, currentTime);
+    const peaks = await findMinima(ohlcData, symbol);
 
     // await dbService.saveFilteredMinimum(symbol, interval, peaks);
-    console.log(peaks, 'FOR MINIMA', symbol);
+    // console.log(peaks, 'FOR MINIMA', symbol);
     return peaks;
 }
 
