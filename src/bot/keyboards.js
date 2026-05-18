@@ -25,8 +25,33 @@ const getContractsKeyboard = (contracts, mode = 'add') => {
  * Клавиатура для выбора таймфрейма
  * @param {string} mode - 'add' или 'delete'
  */
+// const getIntervalsKeyboard = (mode = 'add') => {
+//     const prefix = mode === 'delete' ? 'interval_delete_' : 'interval_add_';
+
+//     const intervals = ['1', '5', '15', '30', '60', '240'];
+
+//     const buttons = intervals.map((interval) =>
+//         Markup.button.callback(interval, `${prefix}${interval}`)
+//     );
+
+//     // Кнопки по 3 в ряд
+//     const keyboard = [];
+//     for (let i = 0; i < buttons.length; i += 3) {
+//         keyboard.push(buttons.slice(i, i + 3));
+//     }
+
+//     return Markup.inlineKeyboard(keyboard);
+// };
 const getIntervalsKeyboard = (mode = 'add') => {
-    const prefix = mode === 'delete' ? 'interval_delete_' : 'interval_add_';
+    let prefix = 'interval_add_';
+
+    // Определяем префикс в зависимости от режима
+    if (mode === 'delete') {
+        prefix = 'interval_delete_';
+    } else if (mode === 'add_35') {
+        prefix = 'interval_add_35_';
+    }
+    // Можно добавить другие режимы позже, например 'add_single' и т.д.
 
     const intervals = ['1', '5', '15', '30', '60', '240'];
 

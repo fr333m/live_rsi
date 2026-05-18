@@ -187,7 +187,7 @@ setInterval(async () => {
 
         await Promise.all(tasks);
     }
-}, 5000); // каждую 5 секунд проверяем сигналы для всех таймфреймов
+}, 10000); // каждую 5 секунд проверяем сигналы для всех таймфреймов
 
 module.exports = {
     startAlignedScheduler,

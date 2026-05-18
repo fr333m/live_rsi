@@ -53,7 +53,10 @@ async function findSignal(symbol, interval) {
             const priceDiffPercent =
                 Math.abs((extremum.closePrice - lastprice) / lastprice) * 100;
 
-            if (rsiValue !== null) {
+            if (rsiValue !== null && interval !== '5') {
+                if (rsiValue.rsi < 60 && type === 'peak') return false;
+                if (rsiValue.rsi > 40 && type === 'minimum') return false;
+            } else {
                 if (rsiValue.rsi < 65 && type === 'peak') return false;
                 if (rsiValue.rsi > 35 && type === 'minimum') return false;
             }
