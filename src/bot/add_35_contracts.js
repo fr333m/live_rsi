@@ -1,7 +1,9 @@
 const { getVolatilityLevel } = require('../signals/rsi/getVolatilityLevel');
 const { updateHistoryData } = require('./add_contracts/update_ohlc_in_bybit');
 const { getRsi } = require('../signals/rsi/rsi_value');
+const { updateRSIfromCache } = require('../signals/updateRSIcache');
 const {
+    runUpdateExtremum_for_1m,
     runUpdateExtremum_for_5m,
     runUpdateExtremum_for_15m,
     runUpdateExtremum_for_60m,
@@ -19,7 +21,7 @@ const pLimit = require('p-limit');
 const limit = pLimit(3); // ← Уменьшил до 3 (самое важное)
 
 // ==================== НАСТРОЙКИ ====================
-const INTERVALS = ['5', '15', '60'];
+const INTERVALS = ['1', '5', '15', '60'];
 const DELAY_BETWEEN_INTERVALS = 1500; // 1.5 секунды пауза между интервалами
 
 // Простой retry
@@ -82,45 +84,11 @@ const add35Contracts = async (ctx) => {
         // ==================== 2. Расчёт RSI + Volatility ====================
         await ctx.reply('📊 Рассчитываю RSI и волатильность...');
 
-        const allResults = [];
-
         for (const interval of INTERVALS) {
-            const dataPromises = contracts.map((contract) =>
-                limit(() =>
-                    withRetry(async () => {
-                        const candles = await dbService.getCandles(
-                            contract.symbol,
-                            interval,
-                            'tracking_contracts',
-                            450
-                        );
-
-                        const rsiValue = await getRsi(candles);
-                        if (rsiValue != null) {
-                            rsiCache.set(contract.symbol, interval, rsiValue);
-                        }
-
-                        const volatilityData =
-                            await getVolatilityLevel(candles);
-
-                        return {
-                            symbol: contract.symbol,
-                            interval,
-                            volatility:
-                                volatilityData?.volatilityForSignal || 0,
-                        };
-                    })
-                )
-            );
-
-            const results = await Promise.all(dataPromises);
-            allResults.push(...results.filter(Boolean));
-
-            await new Promise((r) => setTimeout(r, 1000)); // небольшая пауза
+            await updateRSIfromCache(interval);
         }
 
         // ==================== 3. Сохранение ====================
-        await dbService.saveTrackingContract(allResults);
 
         // ==================== 4. Финализация ====================
         await priceTracker.ensureConnected();
@@ -135,8 +103,7 @@ const add35Contracts = async (ctx) => {
         await ctx.reply(
             `✅ **Готово!**\n\n` +
                 `Контрактов: **${contracts.length}**\n` +
-                `Таймфреймы: **${INTERVALS.join(', ')}m**\n` +
-                `Записей сохранено: **${allResults.length}**`
+                `Таймфреймы: **${INTERVALS.join(', ')}m**\n`
         );
     } catch (error) {
         console.error('Ошибка в add35Contracts:', error);

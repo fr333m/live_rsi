@@ -11,9 +11,7 @@ async function findSignal(symbol, interval) {
 
     try {
         // ==================== 1. Загрузка данных ====================
-        const [trackingData] = await Promise.all([
-            dbService.gettracking_contracts(symbol, interval),
-        ]);
+        const trackingData = rsiCache.get(symbol, interval);
 
         if (!trackingData || trackingData.length === 0) {
             console.log(`❌ Нет tracking_contracts для ${symbol} ${interval}`);
@@ -26,7 +24,7 @@ async function findSignal(symbol, interval) {
             return null;
         }
 
-        const volatility = trackingData[0].volatility ?? 2.0; // дефолтное значение
+        const volatility = trackingData.volatility; // дефолтное значение
         const lastprice = lastPriceData.lastPrice;
 
         console.log(
@@ -53,13 +51,6 @@ async function findSignal(symbol, interval) {
             const priceDiffPercent =
                 Math.abs((extremum.closePrice - lastprice) / lastprice) * 100;
 
-            if (rsiValue !== null && interval !== '5') {
-                if (rsiValue.rsi < 60 && type === 'peak') return false;
-                if (rsiValue.rsi > 40 && type === 'minimum') return false;
-            } else {
-                if (rsiValue.rsi < 65 && type === 'peak') return false;
-                if (rsiValue.rsi > 35 && type === 'minimum') return false;
-            }
             if (priceDiffPercent > volatility) return false;
             if (lastprice > extremum.closePrice && type === 'peak')
                 return false;

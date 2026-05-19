@@ -1,8 +1,8 @@
 const PostgresDB = require('../db/db');
 const dbService = new PostgresDB();
-const { updateOHLC } = require('./updateOHLC');
+const { updateOHLC } = require('./updateOHLC_for_1m');
 const priceTracker = require('../ws/wsClient');
-const { calculationRSI } = require('./rsi/rsi');
+const { aggregateLastCandle } = require('./updateOHLC');
 const { saveLivePrice } = require('./save_live_price');
 const extremumCache = require('../ws/extremumCache');
 const { updateRSIfromCache } = require('./updateRSIcache');
@@ -80,20 +80,17 @@ function startAlignedScheduler() {
             await saveLivePrice();
         }
 
-        if (m % 1 === 0 && symbolUnique_1m.length > 0) {
+        if (
+            (m % 1 === 0 && symbolUnique_5m.length > 0) ||
+            symbolUnique_15m.length > 0 ||
+            symbolUnique_60m.length > 0
+        ) {
             jobQueue.push(async () => {
                 if (priceTracker.ws && priceTracker.ws.readyState === 1) {
                     await Promise.all(
                         symbolUnique_1m.map((symbol) =>
                             updateOHLC(symbol, '1', 60000)
                         )
-                    );
-                    await runUpdateExtremum_for_1m();
-                    await updateRSIfromCache('1');
-
-                    console.log(
-                        'Updated extremum for 1m:',
-                        JSON.stringify(extremumCache.getAll().length)
                     );
                 } else {
                     await priceTracker.start();
@@ -107,7 +104,7 @@ function startAlignedScheduler() {
                 if (priceTracker.ws && priceTracker.ws.readyState === 1) {
                     await Promise.all(
                         symbolUnique_5m.map((symbol) =>
-                            updateOHLC(symbol, '5', 300000)
+                            aggregateLastCandle(symbol, '5')
                         )
                     );
                     await runUpdateExtremum_for_5m();
@@ -123,7 +120,7 @@ function startAlignedScheduler() {
                 if (priceTracker.ws && priceTracker.ws.readyState === 1) {
                     await Promise.all(
                         symbolUnique_15m.map((symbol) =>
-                            updateOHLC(symbol, '15', 900000)
+                            aggregateLastCandle(symbol, '15')
                         )
                     );
                     await runUpdateExtremum_for_15m();
@@ -139,7 +136,7 @@ function startAlignedScheduler() {
                 if (priceTracker.ws && priceTracker.ws.readyState === 1) {
                     await Promise.all(
                         symbolUnique_60m.map((symbol) =>
-                            updateOHLC(symbol, '1h', 3600000)
+                            aggregateLastCandle(symbol, '60')
                         )
                     );
                     await runUpdateExtremum_for_60m();
@@ -171,9 +168,6 @@ setInterval(async () => {
 
     if (priceTracker.ws && priceTracker.ws.readyState === 1) {
         const tasks = [
-            runSearchSignal_for_1m(now).catch((err) =>
-                console.error('1m error:', err)
-            ),
             runSearchSignal_for_5m(now).catch((err) =>
                 console.error('5m error:', err)
             ),
@@ -187,7 +181,7 @@ setInterval(async () => {
 
         await Promise.all(tasks);
     }
-}, 10000); // каждую 5 секунд проверяем сигналы для всех таймфреймов
+}, 5000); // каждую 5 секунд проверяем сигналы для всех таймфреймов
 
 module.exports = {
     startAlignedScheduler,

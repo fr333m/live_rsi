@@ -45,7 +45,7 @@ class RsiCache {
      * @example
      * rsiCache.set('BTCUSDT', '1', 72.45);
      */
-    set(symbol, interval, rsi) {
+    set(symbol, interval, rsi, vol) {
         const value = parseFloat(rsi);
         if (isNaN(value) || value < 0 || value > 100) {
             throw new Error(
@@ -60,6 +60,7 @@ class RsiCache {
             symbol,
             interval,
             rsi: value,
+            volatility: vol,
             prevRsi: prev?.rsi ?? null, // предыдущее значение для отслеживания динамики
             updatedAt: Date.now(),
         });
@@ -122,6 +123,19 @@ class RsiCache {
      */
     getAll() {
         return [...this.cache.values()];
+    }
+
+    /* @example
+     * rsiCache.getAllSymbols();
+     * // ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', ...]
+     */
+
+    getAllSymbols() {
+        const symbols = new Set();
+        for (const record of this.cache.values()) {
+            symbols.add(record.symbol);
+        }
+        return [...symbols];
     }
 
     // ---------------------------------------------------------------------------

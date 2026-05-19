@@ -22,9 +22,8 @@ class BybitpriceTracker extends EventEmitter {
 
         try {
             // Получаем актуальный список контрактов из БД
-            const contracts = await dbService.uniqueSymbol(
-                'all_contracts_tracking'
-            ); // TODO: заменить на реальный запрос к БД
+            const contracts =
+                await dbService.uniqueSymbol('tracking_contracts'); // TODO: заменить на реальный запрос к БД
 
             if (!Array.isArray(contracts) || contracts.length === 0) {
                 console.warn('❌ Нет контрактов для отслеживания');

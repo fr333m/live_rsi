@@ -8,7 +8,7 @@ const HEIGHT = 1080;
 const BACKGROUND_COLOR = '#0d1117';
 
 const CANDLE_WIDTH = 8;
-const MAX_CANDLES = 400;
+const MAX_CANDLES = 250;
 
 // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 
