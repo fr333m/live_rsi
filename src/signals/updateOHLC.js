@@ -9,44 +9,40 @@ async function aggregateLastCandle(symbol, targetInterval) {
     try {
         const minutesMap = { 5: 5, 15: 15, 30: 30, 60: 60 };
         const minutes = minutesMap[targetInterval];
-
         if (!minutes)
             throw new Error(`Неподдерживаемый интервал: ${targetInterval}`);
 
         logger.debug(`Агрегация последней свечи ${symbol} → ${targetInterval}`);
 
-        // Получаем последние N минутных свечей (немного больше, чем нужно)
+        const now = Date.now();
+        const periodMs = minutes * 60 * 1000;
+        const periodStart = Math.floor(now / periodMs) * periodMs;
+
+        // Запрашиваем чуть больше, чем нужно (с запасом на возможные пропуски)
+        const limit = minutes * 3 + 20;
         const minuteCandles = await dbService.getCandles(
             symbol,
             '1',
             'tracking_contracts',
-            minutes * 2 + 10 // небольшой запас
+            limit
         );
 
-        if (!minuteCandles || minuteCandles.length < minutes) {
-            logger.warn(`Недостаточно минутных данных для ${symbol}`);
+        if (!minuteCandles || minuteCandles.length === 0) {
+            logger.warn(`Нет минутных данных для ${symbol}`);
             return false;
         }
 
-        // Сортируем по времени (на всякий случай)
-        minuteCandles.sort((a, b) => a.timestamp - b.timestamp);
-
-        const now = Date.now();
-        // Находим начало текущего периода
-        const lastCandleTime =
-            minuteCandles[minuteCandles.length - 1].timestamp;
-        const periodStart =
-            Math.floor(lastCandleTime / (minutes * 60 * 1000)) *
-            (minutes * 60 * 1000);
-
-        // Берём только свечи, которые входят в текущий период
+        // Фильтруем свечи, попавшие в текущий период
         const relevantCandles = minuteCandles.filter(
             (c) =>
                 c.timestamp >= periodStart &&
-                c.timestamp < periodStart + minutes * 60 * 1000
+                c.timestamp < periodStart + periodMs
         );
 
         if (relevantCandles.length === 0) {
+            logger.debug(
+                `Пока нет данных в текущем периоде ${targetInterval} для ${symbol}`
+            );
             return false;
         }
 
@@ -72,15 +68,12 @@ async function aggregateLastCandle(symbol, targetInterval) {
 
         await dbService.saveCandles(symbol, targetInterval, aggregated);
 
-        logger.info(`✓ ${targetInterval} | 1 свеча обновлена | ${symbol}`);
+        logger.info(`✓ ${targetInterval}m | 1 свеча обновлена | ${symbol}`);
         return true;
     } catch (error) {
-        logger.error(
-            `Ошибка агрегации последней свечи ${symbol} → ${targetInterval}`,
-            {
-                error: error.message,
-            }
-        );
+        logger.error(`Ошибка агрегации ${symbol} → ${targetInterval}`, {
+            error: error.message,
+        });
         return false;
     }
 }
