@@ -78,13 +78,6 @@ function startAlignedScheduler() {
 
         if (m % 1 === 0) {
             await saveLivePrice();
-        }
-
-        if (
-            (m % 1 === 0 && symbolUnique_5m.length > 0) ||
-            symbolUnique_15m.length > 0 ||
-            symbolUnique_60m.length > 0
-        ) {
             jobQueue.push(async () => {
                 if (priceTracker.ws && priceTracker.ws.readyState === 1) {
                     await Promise.all(
