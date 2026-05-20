@@ -27,9 +27,12 @@ async function asyncPool(concurrency, items, iteratorFn) {
 }
 
 async function updateRSIfromCache(interval, concurrency = 12) {
-    if (interval === '1') {
-        return;
+    const statusRSIcache = rsiCache.getByInterval(interval);
+
+    if (statusRSIcache.length > 0) {
+        rsiCache.clearByInterval(interval);
     }
+
     const startTime = Date.now();
 
     try {

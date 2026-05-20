@@ -93,6 +93,7 @@ async function runUpdateExtremum_for_60m() {
 
     return true;
 }
+
 module.exports = {
     runUpdateExtremum_for_1m,
     runUpdateExtremum_for_5m,

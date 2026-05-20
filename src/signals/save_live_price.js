@@ -7,6 +7,8 @@ async function saveLivePrice() {
     if (!records.length) return;
 
     await dbService.saveLivePrice(records);
+
+    return true;
 }
 
 module.exports = {

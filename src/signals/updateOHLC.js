@@ -3,49 +3,40 @@ const dbService = new PostgresDB();
 const logger = require('../utils/logger');
 
 /**
- * Агрегирует ТОЛЬКО самую последнюю свечу для указанного интервала
+ * Агрегирует последние N минутных свечей в одну свечу нужного таймфрейма
  */
 async function aggregateLastCandle(symbol, targetInterval) {
     try {
-        const minutesMap = { 5: 5, 15: 15, 30: 30, 60: 60 };
+        const minutesMap = { 5: 5, 15: 15, 30: 30, 60: 60, 240: 240 };
         const minutes = minutesMap[targetInterval];
-        if (!minutes)
+
+        if (!minutes) {
             throw new Error(`Неподдерживаемый интервал: ${targetInterval}`);
-
-        logger.debug(`Агрегация последней свечи ${symbol} → ${targetInterval}`);
-
-        const now = Date.now();
-        const periodMs = minutes * 60 * 1000;
-        const periodStart = Math.floor(now / periodMs) * periodMs;
-
-        // Запрашиваем чуть больше, чем нужно (с запасом на возможные пропуски)
-        const limit = minutes * 3 + 20;
-        const minuteCandles = await dbService.getCandles(
-            symbol,
-            '1',
-            'tracking_contracts',
-            limit
-        );
-
-        if (!minuteCandles || minuteCandles.length === 0) {
-            logger.warn(`Нет минутных данных для ${symbol}`);
-            return false;
         }
 
-        // Фильтруем свечи, попавшие в текущий период
-        const relevantCandles = minuteCandles.filter(
-            (c) =>
-                c.timestamp >= periodStart &&
-                c.timestamp < periodStart + periodMs
+        logger.debug(
+            `Агрегация последней свечи ${symbol} → ${targetInterval}min`
         );
 
-        if (relevantCandles.length === 0) {
-            logger.debug(
-                `Пока нет данных в текущем периоде ${targetInterval} для ${symbol}`
+        // Получаем ровно нужное количество минутных свечей
+        const minuteCandles = await dbService.getCandles(
+            symbol,
+            '1', // минутный таймфрейм
+            'tracking_contracts',
+            minutes + 5 // небольшой запас на всякий случай
+        );
+
+        if (!minuteCandles || minuteCandles.length < minutes) {
+            logger.warn(
+                `Недостаточно минутных свечей для ${symbol} (${minuteCandles?.length || 0}/${minutes})`
             );
             return false;
         }
 
+        // Берём последние N свечей
+        const relevantCandles = minuteCandles.slice(-minutes);
+
+        // Формируем агрегированную свечу
         const open = relevantCandles[0].open;
         let high = relevantCandles[0].high;
         let low = relevantCandles[0].low;
@@ -56,9 +47,12 @@ async function aggregateLastCandle(symbol, targetInterval) {
             low = Math.min(low, c.low);
         }
 
+        // Время свечи = время первой свечи в группе
+        const candleTime = relevantCandles[0].timestamp;
+
         const aggregated = [
             [
-                periodStart,
+                candleTime,
                 parseFloat(open),
                 parseFloat(high),
                 parseFloat(low),
@@ -68,10 +62,10 @@ async function aggregateLastCandle(symbol, targetInterval) {
 
         await dbService.saveCandles(symbol, targetInterval, aggregated);
 
-        logger.info(`✓ ${targetInterval}m | 1 свеча обновлена | ${symbol}`);
+        logger.info(`✓ ${targetInterval}min | 1 свеча обновлена | ${symbol}`);
         return true;
     } catch (error) {
-        logger.error(`Ошибка агрегации ${symbol} → ${targetInterval}`, {
+        logger.error(`Ошибка агрегации ${symbol} → ${targetInterval}min`, {
             error: error.message,
         });
         return false;
@@ -85,7 +79,7 @@ async function updateLastCandles(symbol) {
     const intervals = [5, 15, 30, 60];
     let successCount = 0;
 
-    logger.info(`🔄 Обновление последних свечей для ${symbol}`);
+    logger.info(`🔄 Обновление свечей для ${symbol}`);
 
     for (const tf of intervals) {
         const ok = await aggregateLastCandle(symbol, tf);
@@ -93,21 +87,18 @@ async function updateLastCandles(symbol) {
     }
 
     logger.info(
-        `✅ Завершено обновление ${symbol} | Обновлено ${successCount}/${intervals.length} таймфреймов`
+        `✅ ${symbol} | Обновлено ${successCount}/${intervals.length} таймфреймов`
     );
     return successCount;
 }
 
 /**
- * Массовое обновление для списка символов
+ * Массовое обновление
  */
 async function updateLastCandlesMultiple(symbols, concurrency = 5) {
-    logger.info(
-        `🚀 Массовое обновление последних свечей для ${symbols.length} символов`
-    );
+    logger.info(`🚀 Массовое обновление для ${symbols.length} символов`);
 
     let index = 0;
-
     const runNext = async () => {
         while (index < symbols.length) {
             const symbol = symbols[index++];
@@ -118,9 +109,7 @@ async function updateLastCandlesMultiple(symbols, concurrency = 5) {
     const workers = Array.from({ length: concurrency }, runNext);
     await Promise.all(workers);
 
-    logger.info(
-        `🎉 Обновление последних свечей завершено для ${symbols.length} символов`
-    );
+    logger.info(`🎉 Обновление завершено для ${symbols.length} символов`);
 }
 
 module.exports = {

@@ -28,19 +28,23 @@ async function printTable() {
     // const lastpriceData = priceCache.getLast('SOLUSDT');
     // const lastprice = lastpriceData.lastprice;
     // const candles = priceCache.getLast('SOLUSDT');
-    const contracts = await dbService.uniqueSymbol('tracking_contracts');
+    // const contracts = await dbService.uniqueSymbol('tracking_contracts');
 
-    console.log(contracts.length);
+    // console.log(contracts.length);
 
     // await dbService.printTable('tracking_contracts', 100);
-    // const ohlcData = await dbService.getCandles(
-    //     'DOGEUSDT',
-    //     '5',
-    //     'tracking_contracts',
-    //     300000
-    // );
+    const ohlcData = await dbService.getCandles(
+        'BTCUSDT',
+        '5',
+        'tracking_contracts',
+        500
+    );
+
+    const ohlcSlice = ohlcData.slice(-50);
+
+    console.table(ohlcData);
     // console.log('Последняя цена для DOGEUSDT:', lastPrice);
-    // console.log(ohlcData);
+
     // const row = await dbService.checkRowForTypeSignal('ADAUSDT', '1', 'double_top', 'control_send_signal', 1778591460000);
     // console.log(typeof row.timestamp);
 
@@ -70,9 +74,9 @@ async function printTable() {
 // }
 // test();
 
-startAlignedScheduler();
+// startAlignedScheduler();
 
-console.log('🚀 Запуск бота...');
+// console.log('🚀 Запуск бота...');
 
 const bot = createBot();
 let isBotRunning = false;
