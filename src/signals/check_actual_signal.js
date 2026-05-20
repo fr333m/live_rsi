@@ -1,7 +1,22 @@
 const PostgresDB = require('../../src/db/db');
 const dbService = new PostgresDB();
 
-const SIGNAL_INTERVAL = 3600000; // 60 минут (можно сделать параметром)
+// ==================== CONFIG ====================
+const COOLDOWN_CONFIG = {
+    1: 10 * 60 * 1000, // 10 минут
+    3: 10 * 60 * 1000,
+    5: 10 * 60 * 1000, // 10 минут
+    15: 30 * 60 * 1000, // 30 минут
+    30: 30 * 60 * 1000,
+    60: 30 * 60 * 1000, // 30 минут
+    120: 45 * 60 * 1000, // 45 минут (пример)
+    240: 60 * 60 * 1000, // 1 час
+    D: 2 * 60 * 60 * 1000, // 2 часа для дневного
+    // добавляй по необходимости
+};
+
+const DEFAULT_COOLDOWN = 60 * 60 * 1000; // 60 минут по умолчанию
+// ===============================================
 
 async function checkActualSignal(
     symbol,
@@ -26,6 +41,9 @@ async function checkActualSignal(
         throw new Error('timestamp must be a positive number');
     }
 
+    // === Получаем cooldown для текущего таймфрейма ===
+    const cooldownMs = COOLDOWN_CONFIG[interval] ?? DEFAULT_COOLDOWN;
+
     try {
         const existing = await dbService.checkRowForTypeSignal(
             symbol,
@@ -35,7 +53,7 @@ async function checkActualSignal(
             String(levelTimeStamp)
         );
 
-        // Если записи нет — разрешаем сигнал и сохраняем
+        // Если записи нет — разрешаем сигнал
         if (!existing) {
             await dbService.saveSendSignalControl(
                 symbol,
@@ -45,25 +63,23 @@ async function checkActualSignal(
                 levelTimeStamp
             );
             console.log(
-                `[Signal Control] ✅ NEW signal: ${symbol} ${interval} | ${typeSignal}`
+                `[Signal Control] ✅ NEW signal: ${symbol} ${interval} | ${typeSignal} (cooldown ${cooldownMs / 60000} min)`
             );
             return true;
         }
 
-        // Если запись есть — проверяем время
+        // Если запись есть — проверяем cooldown
         const timeDiff = normalizedTimestamp - Number(existing.timestamp);
 
-        if (timeDiff < SIGNAL_INTERVAL) {
-            const minutesLeft = Math.round(
-                (SIGNAL_INTERVAL - timeDiff) / 60000
-            );
+        if (timeDiff < cooldownMs) {
+            const minutesLeft = Math.round((cooldownMs - timeDiff) / 60000);
             console.log(
-                `[Signal Control] ⛔ BLOCKED: ${symbol} ${interval} | ${typeSignal} — cooldown ${minutesLeft} min`
+                `[Signal Control] ⛔ BLOCKED: ${symbol} ${interval} | ${typeSignal} — ${minutesLeft} min left`
             );
             return false;
         }
 
-        // Прошло достаточно времени — обновляем запись
+        // Прошло достаточно времени — обновляем
         await dbService.removeRowOnSymbol(
             symbol,
             'control_send_signal',
@@ -87,7 +103,7 @@ async function checkActualSignal(
             `[Signal Control Error] ${symbol} ${interval} ${typeSignal}:`,
             error
         );
-        throw error; // или return false — зависит от стратегии
+        throw error;
     }
 }
 
