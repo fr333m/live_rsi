@@ -1,3 +1,5 @@
+const logger = require('../utils/logger');
+
 const { Pool } = require('pg');
 require('dotenv').config();
 
@@ -927,24 +929,45 @@ class PostgresDB {
     // getLastMinutePrices
     // ---------------------------------------------------------------------------
     async getLastMinutePrices(symbol, currentTimestamp) {
-        if (!symbol || typeof symbol !== 'string')
+        if (!symbol || typeof symbol !== 'string') {
             throw new Error('Invalid symbol');
+        }
 
-        // Get max timestamp, then fetch last-minute records — single query in Postgres
-        const res = await this.query(
-            `
-      SELECT * FROM live_prices
-      WHERE symbol = $1
-        AND timestamp >= (
-          SELECT MAX(timestamp) - $2 FROM live_prices WHERE symbol = $1
-        )
-      ORDER BY timestamp ASC
-    `,
-            [symbol, currentTimestamp]
-        );
-        return res.rows;
+        const ts = currentTimestamp || Date.now();
+        const ONE_MINUTE = 60 * 1000;
+        const startTime = ts - ONE_MINUTE; // ← вычисляем в JS
+
+        try {
+            const res = await this.query(
+                `
+            SELECT timestamp, lastprice
+            FROM live_prices
+            WHERE symbol = $1
+              AND timestamp >= $2
+              AND timestamp <= $3
+            ORDER BY timestamp ASC
+            LIMIT 5000
+            `,
+                [symbol, startTime, ts]
+            );
+
+            const count = res.rows.length;
+
+            if (count === 0) {
+                logger.debug(`No live_prices for ${symbol} in last minute`);
+            } else {
+                logger.debug(`Fetched ${count} prices for ${symbol}`);
+            }
+
+            return res.rows;
+        } catch (error) {
+            logger.error(
+                `Failed getLastMinutePrices ${symbol}:`,
+                error.message
+            );
+            throw error;
+        }
     }
-
     // ---------------------------------------------------------------------------
     // close
     // ---------------------------------------------------------------------------

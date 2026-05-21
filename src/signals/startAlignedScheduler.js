@@ -2,6 +2,7 @@ const PostgresDB = require('../db/db');
 const dbService = new PostgresDB();
 const { updateOHLC } = require('./updateOHLC_for_1m');
 const priceTracker = require('../ws/wsClient');
+const priceCache = require('../ws/priceCache');
 const { aggregateLastCandle } = require('./updateOHLC');
 const { saveLivePrice } = require('./save_live_price');
 const extremumCache = require('../ws/extremumCache');
@@ -44,14 +45,13 @@ async function processQueue() {
 // ====================== SCHEDULER ======================
 
 function startAlignedScheduler() {
-    const ALIGN_MINUTES = 1; // можно менять
-
     async function onTick() {
         try {
             const now = new Date();
             console.log(`⏱ Tick at ${now.toISOString()}`);
 
-            const m = now.getMinutes();
+            // const m = now.getMinutes();
+            const m = now.getUTCMinutes();
 
             // Получаем уникальные символы один раз
             const [sym1, sym5, sym15, sym60] = await Promise.all([
@@ -63,15 +63,15 @@ function startAlignedScheduler() {
 
             // === 1-минутные задачи ===
             if (m % 1 === 0) {
-                await saveLivePrice();
+                // await saveLivePrice();
 
                 jobQueue.push(async () => {
                     if (!priceTracker.ws || priceTracker.ws.readyState !== 1) {
                         await priceTracker.start();
-                        return;
                     } else {
                         for (const symbol of sym1) {
                             await updateOHLC(symbol, '1', 60000);
+                            priceCache.clearBySymbol(symbol);
                         }
                     }
 
@@ -84,15 +84,13 @@ function startAlignedScheduler() {
                 jobQueue.push(async () => {
                     if (!priceTracker.ws || priceTracker.ws.readyState !== 1) {
                         await priceTracker.start();
-                        return;
                     } else {
                         for (const symbol of sym5) {
                             await aggregateLastCandle(symbol, '5');
                         }
+                        await runUpdateExtremum_for_5m();
+                        await updateRSIfromCache('5');
                     }
-
-                    await runUpdateExtremum_for_5m();
-                    await updateRSIfromCache('5');
                 });
             }
 
@@ -101,15 +99,13 @@ function startAlignedScheduler() {
                 jobQueue.push(async () => {
                     if (!priceTracker.ws || priceTracker.ws.readyState !== 1) {
                         await priceTracker.start();
-                        return;
                     } else {
                         for (const symbol of sym15) {
                             await aggregateLastCandle(symbol, '15');
                         }
+                        await runUpdateExtremum_for_15m();
+                        await updateRSIfromCache('15');
                     }
-
-                    await runUpdateExtremum_for_15m();
-                    await updateRSIfromCache('15');
                 });
             }
 
@@ -118,15 +114,13 @@ function startAlignedScheduler() {
                 jobQueue.push(async () => {
                     if (!priceTracker.ws || priceTracker.ws.readyState !== 1) {
                         await priceTracker.start();
-                        return;
                     } else {
                         for (const symbol of sym60) {
                             await aggregateLastCandle(symbol, '60');
                         }
+                        await runUpdateExtremum_for_60m();
+                        await updateRSIfromCache('60');
                     }
-
-                    await runUpdateExtremum_for_60m();
-                    await updateRSIfromCache('60');
                 });
             }
 
@@ -153,41 +147,41 @@ function startAlignedScheduler() {
     scheduleNextTick();
 }
 
-// setInterval(async () => {
-//     const now = Date.now();
-
-//     if (priceTracker.ws && priceTracker.ws.readyState === 1) {
-//         const tasks = [
-//             runSearchSignal_for_5m(now).catch((err) =>
-//                 console.error('5m error:', err)
-//             ),
-//             runSearchSignal_for_15m(now).catch((err) =>
-//                 console.error('15m error:', err)
-//             ),
-//             runSearchSignal_for_60m(now).catch((err) =>
-//                 console.error('60m error:', err)
-//             ),
-//         ];
-
-//         await Promise.all(tasks);
-//     }
-// }, 5000);
-
 setInterval(async () => {
-    if (!priceTracker?.ws?.readyState === 1) return;
+    const now = Date.now();
 
-    try {
-        const now = Date.now();
-        await Promise.all([
-            runSearchSignal_for_1m(now).catch(() => {}),
-            runSearchSignal_for_5m(now).catch(() => {}),
-            runSearchSignal_for_15m(now).catch(() => {}),
-            runSearchSignal_for_60m(now).catch(() => {}),
-        ]);
-    } catch (e) {
-        console.error('Signal error:', e);
+    if (priceTracker.ws && priceTracker.ws.readyState === 1) {
+        const tasks = [
+            runSearchSignal_for_5m(now).catch((err) =>
+                console.error('5m error:', err)
+            ),
+            runSearchSignal_for_15m(now).catch((err) =>
+                console.error('15m error:', err)
+            ),
+            runSearchSignal_for_60m(now).catch((err) =>
+                console.error('60m error:', err)
+            ),
+        ];
+
+        await Promise.all(tasks);
     }
 }, 5000);
+
+// setInterval(async () => {
+//     if (!priceTracker?.ws?.readyState === 1) return;
+
+//     try {
+//         const now = Date.now();
+//         await Promise.all([
+//             runSearchSignal_for_1m(now).catch(() => {}),
+//             runSearchSignal_for_5m(now).catch(() => {}),
+//             runSearchSignal_for_15m(now).catch(() => {}),
+//             runSearchSignal_for_60m(now).catch(() => {}),
+//         ]);
+//     } catch (e) {
+//         console.error('Signal error:', e);
+//     }
+// }, 5000);
 
 // ====================== Отдельный интервал 5 сек ======================
 

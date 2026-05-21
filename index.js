@@ -34,15 +34,15 @@ async function printTable() {
 
     // await dbService.printTable('tracking_contracts', 100);
     const ohlcData = await dbService.getCandles(
-        'BTCUSDT',
-        '5',
+        'DOGEUSDT',
+        '1',
         'tracking_contracts',
-        500
+        10
     );
 
     const ohlcSlice = ohlcData.slice(-50);
 
-    console.table(ohlcData);
+    console.log(ohlcData);
     // console.log('Последняя цена для DOGEUSDT:', lastPrice);
 
     // const row = await dbService.checkRowForTypeSignal('ADAUSDT', '1', 'double_top', 'control_send_signal', 1778591460000);
@@ -74,7 +74,7 @@ async function printTable() {
 // }
 // test();
 
-// startAlignedScheduler();
+startAlignedScheduler();
 
 // console.log('🚀 Запуск бота...');
 
