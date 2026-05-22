@@ -71,7 +71,6 @@ function startAlignedScheduler() {
                     } else {
                         for (const symbol of sym1) {
                             await updateOHLC(symbol, '1', 60000);
-                            priceCache.clearBySymbol(symbol);
                         }
                     }
 
@@ -165,7 +164,7 @@ setInterval(async () => {
 
         await Promise.all(tasks);
     }
-}, 5000);
+}, 7000);
 
 // setInterval(async () => {
 //     if (!priceTracker?.ws?.readyState === 1) return;

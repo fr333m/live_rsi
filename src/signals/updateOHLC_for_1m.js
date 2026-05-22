@@ -14,9 +14,13 @@ const logger = require('../utils/logger');
 
 async function updateOHLC(symbol, interval) {
     try {
-        if (!interval || isNaN(Number(interval))) {
+        if (
+            !interval ||
+            !Number.isInteger(Number(interval)) ||
+            Number(interval) <= 0
+        ) {
             logger.warn(
-                `updateOHLC: некорректный интервал "${interval}" для ${symbol}`
+                `[OHLC] Некорректный интервал "${interval}" для ${symbol}`
             );
             return false;
         }
@@ -25,7 +29,7 @@ async function updateOHLC(symbol, interval) {
 
         logger.debug(`[OHLC] Starting update for ${symbol} (${interval}m)`);
 
-        let ohlcData = priceCache.getBySymbol(symbol);
+        const ohlcData = priceCache.getBySymbol(symbol);
 
         if (!ohlcData || !Array.isArray(ohlcData) || ohlcData.length === 0) {
             logger.debug(`[OHLC] Нет данных в кэше для ${symbol}`);
@@ -47,22 +51,32 @@ async function updateOHLC(symbol, interval) {
             return false;
         }
 
-        const lastTickTime = validData[validData.length - 1].timestamp;
-
-        // === Правильный расчёт начала свечи ===
+        // Определяем границы текущей свечи по первому тику
         const candleTimestamp =
-            Math.floor(lastTickTime / intervalMs) * intervalMs;
+            Math.floor(validData[0].timestamp / intervalMs) * intervalMs;
+        const candleEnd = candleTimestamp + intervalMs;
 
-        const open = validData[0].lastPrice;
-        const close = validData[validData.length - 1].lastPrice;
+        // Берём только тики текущей свечи
+        const currentCandleData = validData.filter(
+            (item) =>
+                item.timestamp >= candleTimestamp && item.timestamp < candleEnd
+        );
 
-        let high = open;
-        let low = open;
+        if (currentCandleData.length === 0) {
+            logger.warn(
+                `[OHLC] Нет тиков для текущей свечи | symbol=${symbol} | interval=${interval}`
+            );
+            return false;
+        }
 
-        for (let i = 1; i < validData.length; i++) {
-            const price = validData[i].lastPrice;
-            if (price > high) high = price;
-            if (price < low) low = price;
+        const open = currentCandleData[0].lastPrice;
+        const close = currentCandleData[currentCandleData.length - 1].lastPrice;
+
+        let high = -Infinity;
+        let low = Infinity;
+        for (const item of currentCandleData) {
+            if (item.lastPrice > high) high = item.lastPrice;
+            if (item.lastPrice < low) low = item.lastPrice;
         }
 
         const ohlcArr = [[candleTimestamp, open, high, low, close]];
@@ -72,10 +86,10 @@ async function updateOHLC(symbol, interval) {
         logger.info(
             `[OHLC] ✅ ${symbol} (${interval}m) | ` +
                 `O:${open.toFixed(8)} H:${high.toFixed(8)} L:${low.toFixed(8)} C:${close.toFixed(8)} | ` +
-                `${validData.length} ticks | Candle TS: ${new Date(candleTimestamp).toISOString()}`
+                `${currentCandleData.length} ticks | Candle TS: ${new Date(candleTimestamp).toISOString()}`
         );
 
-        // Очищаем кэш после успешного сохранения
+        // Очищаем только тики сохранённой свечи
         priceCache.clearBySymbol(symbol);
 
         return true;
