@@ -45,7 +45,7 @@ class RsiCache {
      * @example
      * rsiCache.set('BTCUSDT', '1', 72.45);
      */
-    set(symbol, interval, rsi, vol) {
+    set(symbol, interval, rsi, vol, volatPrecent, atr) {
         const value = parseFloat(rsi);
         if (isNaN(value) || value < 0 || value > 100) {
             throw new Error(
@@ -61,12 +61,14 @@ class RsiCache {
             interval,
             rsi: value,
             volatility: vol,
+            volPrecent: volatPrecent,
+            atr: atr,
             prevRsi: prev?.rsi ?? null, // предыдущее значение для отслеживания динамики
             updatedAt: Date.now(),
         });
 
         console.log(
-            `[RsiCache] set: ${symbol} ${interval} → RSI ${value}${prev ? ` (prev: ${prev.rsi})` : ''}`
+            `[RsiCache] set: ${symbol} ${interval} → RSI ${volatPrecent} ${value}${prev ? ` (prev: ${prev.rsi})` : ''}`
         );
     }
 

@@ -1,6 +1,5 @@
 const BybitClient = require('../../rest/bybitRest');
-const PostgresDB = require('../../db/db');
-const dbService = new PostgresDB();
+const dbService = require('../../db/dbInstance');
 const bybitClient = new BybitClient();
 
 async function updateHistoryData(symbol, interval) {

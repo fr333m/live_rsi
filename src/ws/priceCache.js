@@ -172,6 +172,30 @@ class PriceCache {
     }
 
     // ---------------------------------------------------------------------------
+    // clearBefore
+    // ---------------------------------------------------------------------------
+    /**
+     * Удалить тики символа с timestamp < beforeTs, сохранив более новые.
+     * Используется после сохранения свечи — тики следующей минуты остаются.
+     * @param {string} symbol
+     * @param {number} beforeTs - граница (не включается)
+     */
+    clearBefore(symbol, beforeTs) {
+        if (!symbol || typeof symbol !== 'string')
+            throw new Error('Invalid symbol');
+
+        const ticks = this.ticks.get(symbol);
+        if (!ticks) return;
+
+        const remaining = ticks.filter((t) => t.timestamp >= beforeTs);
+        if (remaining.length === 0) {
+            this.ticks.delete(symbol);
+        } else {
+            this.ticks.set(symbol, remaining);
+        }
+    }
+
+    // ---------------------------------------------------------------------------
     // clearAll
     // ---------------------------------------------------------------------------
     /**

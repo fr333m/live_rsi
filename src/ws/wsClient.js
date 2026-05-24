@@ -1,7 +1,6 @@
 // price-tracker.js
 const WebSocket = require('ws');
-const PostgresDB = require('../db/db');
-const dbService = new PostgresDB();
+const dbService = require('../db/dbInstance');
 const { EventEmitter } = require('events');
 const priceCache = require('./priceCache');
 

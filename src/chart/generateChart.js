@@ -1,11 +1,16 @@
-const PostgresDB = require('../db/db');
-const dbService = new PostgresDB();
+const dbService = require('../db/dbInstance');
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 
 // ==================== КОНСТАНТЫ ====================
 const WIDTH = 1980;
 const HEIGHT = 1080;
 const BACKGROUND_COLOR = '#0d1117';
+
+const chartJSNodeCanvas = new ChartJSNodeCanvas({
+    width: WIDTH,
+    height: HEIGHT,
+    backgroundColour: BACKGROUND_COLOR,
+});
 
 const CANDLE_WIDTH = 8;
 const MAX_CANDLES = 250;
@@ -42,12 +47,6 @@ function formatTimeLabel(timestamp) {
 // ==================== ОСНОВНАЯ ФУНКЦИЯ ====================
 
 async function generateChart(symbol, interval, extraData = {}) {
-    const chartJSNodeCanvas = new ChartJSNodeCanvas({
-        width: WIDTH,
-        height: HEIGHT,
-        backgroundColour: BACKGROUND_COLOR,
-    });
-
     const ohlcData = await dbService.getCandles(
         symbol,
         interval,
@@ -223,8 +222,8 @@ function createPriceLinePlugin(lastPrice) {
             ctx.setLineDash([6, 4]);
 
             ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(chart.width, y);
+            ctx.moveTo(chart.chartArea.left, y);
+            ctx.lineTo(chart.chartArea.right, y);
             ctx.stroke();
 
             ctx.restore();
@@ -233,17 +232,12 @@ function createPriceLinePlugin(lastPrice) {
 }
 
 function createExtraLevelPlugin(ohlcData, extraData) {
-    console.log('Генерация графика с extraData:', extraData);
     return {
         id: 'extraLevel',
         afterDraw(chart) {
             const peak = extraData?.peak ?? extraData?.minimum;
 
-            // Исправленная проверка — не падает на index === 0
-            if (!peak || peak.index == null) return;
-
-            const index = peak.index;
-            if (index < 0 || index >= ohlcData.length) return;
+            if (!peak) return;
 
             // Определяем тип уровня из extraData.extra
             const isPeak = extraData.extra === 'peak';
@@ -252,11 +246,11 @@ function createExtraLevelPlugin(ohlcData, extraData) {
             let levelPrice;
             let color;
 
-            if (isPeak && peak.highPrice) {
-                levelPrice = peak.highPrice;
+            if (isPeak && peak.closePrice) {
+                levelPrice = peak.closePrice;
                 color = '#ef4444'; // красный для максимумов
-            } else if (isMin && peak.lowPrice) {
-                levelPrice = peak.lowPrice;
+            } else if (isMin && peak.closePrice) {
+                levelPrice = peak.closePrice;
                 color = '#22c55e'; // зелёный для минимумов
             } else {
                 return;

@@ -1,6 +1,5 @@
 const priceCache = require('../ws/priceCache');
-const PostgresDB = require('../db/db');
-const dbService = new PostgresDB();
+const dbService = require('../db/dbInstance');
 
 async function saveLivePrice() {
     const records = priceCache.flush();

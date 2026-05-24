@@ -1,7 +1,6 @@
 const { getRsi } = require('./rsi_value');
 const { sendSignal } = require('../../../src/bot/send_signal');
-const PostgresDB = require('../../../src/db/db');
-const dbService = new PostgresDB();
+const dbService = require('../../db/dbInstance');
 const { checkActualSignal } = require('../check_actual_signal');
 
 async function calculationRSI(interval) {

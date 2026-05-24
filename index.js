@@ -1,6 +1,5 @@
 const { priceTracker } = require('./src/ws/wsClient');
-const PostgresDB = require('./src/db/db');
-const dbService = new PostgresDB();
+const dbService = require('./src/db/dbInstance');
 const BybitClient = require('./src/rest/bybitRest');
 const bybitClient = new BybitClient();
 const { createBot } = require('./src/bot/bot');
@@ -34,10 +33,10 @@ async function printTable() {
 
     // await dbService.printTable('tracking_contracts', 100);
     const ohlcData = await dbService.getCandles(
-        'VVVUSDT',
+        'WLDUSDT',
         '1',
         'tracking_contracts',
-        50
+        150
     );
 
     const ohlcSlice = ohlcData.slice(-50);

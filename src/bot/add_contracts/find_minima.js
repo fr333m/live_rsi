@@ -1,58 +1,31 @@
 const { formatShort } = require('./transform_timestamp');
-const PostgresDB = require('../../../src/db/db');
-const dbService = new PostgresDB();
 const priceTracker = require('../../ws/wsClient');
 
+const FRACTAL_BARS = 2; // bars on each side (classic Bill Williams = 2)
+
+function isFractalLow(candles, i) {
+    const low = candles[i].low;
+    for (let j = 1; j <= FRACTAL_BARS; j++) {
+        if (candles[i - j].low <= low || candles[i + j].low <= low)
+            return false;
+    }
+    return true;
+}
+
 async function findMinima(candles, symbol) {
-    // console.log(`\n=== findMinima START | ${symbol} | Свечей: ${candles.length} ===`);
+    if (!candles || candles.length < FRACTAL_BARS * 2 + 1) return [];
 
-    if (!candles || candles.length < 30) {
-        // console.log("❌ Мало свечей");
-        return [];
-    }
+    const currentPrice = priceTracker.getPrice(symbol)?.lastPrice;
+    if (!currentPrice) return [];
 
-    const lastRecord = priceTracker.getPrice(symbol)?.lastPrice;
-    if (!lastRecord) {
-        // console.log("❌ Нет данных цены в кэше для символа");
-        return [];
-    }
-
-    const currentPrice = lastRecord.lastPrice;
-    // console.log(`Текущая цена: ${currentPrice}`);
-
-    const windowSize = 20;
     const allLocalMins = [];
 
-    // console.log(`\n=== Поиск локальных минимумов (window = ${windowSize}) ===`);
-
-    for (let i = windowSize; i < candles.length - windowSize; i++) {
+    for (let i = FRACTAL_BARS; i < candles.length - FRACTAL_BARS; i++) {
         const candle = candles[i];
         const low = candle.low;
 
         if (low > currentPrice) continue;
-
-        // Проверка — является ли минимумом в окне
-        let isLocalMin = true;
-        for (let j = i - windowSize; j <= i + windowSize; j++) {
-            if (j !== i && candles[j].low <= low) {
-                isLocalMin = false;
-                break;
-            }
-        }
-
-        if (!isLocalMin) continue;
-
-        // Дополнительная информация для отладки
-        const leftLow = Math.min(
-            ...candles.slice(Math.max(0, i - 20), i).map((c) => c.low)
-        );
-        const rightLow = Math.min(
-            ...candles
-                .slice(i + 1, Math.min(candles.length, i + 20))
-                .map((c) => c.low)
-        );
-
-        // console.log(`   [${i.toString().padStart(3)}] Low = ${low.toFixed(6)} | Left20=${leftLow.toFixed(6)} | Right20=${rightLow.toFixed(6)} | OK`);
+        if (!isFractalLow(candles, i)) continue;
 
         allLocalMins.push({
             ...candle,
@@ -64,17 +37,10 @@ async function findMinima(candles, symbol) {
         });
     }
 
-    // console.log(`\nНайдено локальных минимумов: ${allLocalMins.length}`);
+    if (allLocalMins.length === 0) return [];
 
-    if (allLocalMins.length === 0) {
-        // console.log("❌ Не найдено ни одного локального минимума");
-        return [];
-    }
-
-    // === Финальная фильтрация (убывающая последовательность) ===
-    const finalMinima = [allLocalMins[allLocalMins.length - 1]]; // самый новый минимум
-
-    // console.log(`\nФинальная убывающая фильтрация...`);
+    // Build descending support sequence (newest → oldest, then reverse)
+    const finalMinima = [allLocalMins[allLocalMins.length - 1]];
 
     for (let i = allLocalMins.length - 2; i >= 0; i--) {
         const curr = allLocalMins[i];
@@ -88,18 +54,10 @@ async function findMinima(candles, symbol) {
             last.index - curr.index > 4
         ) {
             finalMinima.push(curr);
-            // console.log(`   ✅ Добавлен: ${curr.dateTime} (-${diffPercent.toFixed(2)}%)`);
-        } else {
-            // console.log(`   ❌ Пропущен: ${curr.dateTime} (разница ${diffPercent.toFixed(2)}%)`);
         }
     }
 
-    const result = finalMinima.reverse();
-    // console.log(`\n=== findMinima FINISH | Возвращаем ${result.length} минимумов ===\n`);
-
-    return result;
+    return finalMinima.reverse();
 }
 
-module.exports = {
-    findMinima,
-};
+module.exports = { findMinima };

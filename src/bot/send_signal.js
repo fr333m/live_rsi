@@ -16,6 +16,9 @@ const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
  * @param {string} dataTime
  * @returns {Promise<object>}
  */
+/**
+ * Отправляет сигнал с двумя графиками: текущий таймфрейм + 60-минутный
+ */
 async function sendSignal(
     symbol,
     interval,
@@ -25,50 +28,68 @@ async function sendSignal(
     rsiValue
 ) {
     try {
-        // Генерация графика
-        const imageBuffer = await generateChart(symbol, interval, extraData);
+        // === Генерация двух графиков ===
+        const mainChartBuffer = await generateChart(
+            symbol,
+            interval,
+            extraData
+        );
 
-        // Текст сообщения
-        const messageText = `
-🚨 *RSI TOP ALERT*
+        let charts = [
+            {
+                type: 'photo',
+                media: mainChartBuffer,
+                caption: getMessageText(
+                    symbol,
+                    interval,
+                    signalType,
+                    dataTime,
+                    rsiValue
+                ),
+                parse_mode: 'Markdown',
+            },
+        ];
 
-📊 Инструмент: *${symbol}*
-⏱️ Таймфрейм: *${interval}*
-🔔 Сигнал: *${signalType}*
-⏱️ Время: *${dataTime}*
-📊 RSI: *${rsiValue}*
+        // Добавляем второй график (60m), если текущий интервал отличается
+        if (interval !== '60' && interval !== '60m') {
+            const h1ChartBuffer = await generateChart(symbol, '60', extraData);
 
-*Анализ показывает потенциальное движение вверх по этому инструменту.*
-        `.trim();
+            charts.push({
+                type: 'photo',
+                media: h1ChartBuffer,
+            });
+        }
 
         // Кнопки
         const keyboard = {
             inline_keyboard: [
                 [
                     {
-                        text: `📈 ${symbol}`,
+                        text: `📈 Торговать ${symbol}`,
                         url: `https://www.bybit.com/trade/usdt/${symbol}`,
                     },
                 ],
             ],
         };
 
-        // Отправка изображения с подписью
-        const result = await bot.sendPhoto(TELEGRAM_CHAT_ID, imageBuffer, {
-            caption: messageText,
+        // Отправляем как медиагруппу (альбом)
+        const result = await bot.sendMediaGroup(TELEGRAM_CHAT_ID, charts);
 
-            parse_mode: 'Markdown',
-
-            reply_markup: keyboard,
-        });
+        // Отправляем клавиатуру отдельным сообщением (прикрепляем к альбому)
+        if (result && result.length > 0) {
+            await bot.sendMessage(TELEGRAM_CHAT_ID, 'Выберите действие:', {
+                reply_markup: keyboard,
+                reply_to_message_id: result[0].message_id,
+            });
+        }
 
         console.log(
-            `✅ Оповещение успешно отправлено для ${symbol} (${interval})`
+            `✅ Оповещение отправлено для ${symbol} (${interval} + 60m)`
         );
 
         return {
             success: true,
-            messageId: result.message_id,
+            messageId: result[0]?.message_id,
             symbol,
             interval,
             timestamp: new Date().toISOString(),
@@ -87,6 +108,22 @@ async function sendSignal(
             timestamp: new Date().toISOString(),
         };
     }
+}
+
+// Вспомогательная функция для текста сообщения
+function getMessageText(symbol, interval, signalType, dataTime, rsiValue) {
+    return `
+🚨 *RSI TOP ALERT*
+
+📊 Инструмент: *${symbol}*
+⏱️ Таймфрейм: *${interval}*
+🔔 Сигнал: *${signalType}*
+⏱️ Время: *${dataTime}*
+📊 RSI: *${rsiValue}*
+
+📈 Также прикреплён график на 60-минутном таймфрейме.
+
+*Анализ показывает потенциальное движение вверх.*`.trim();
 }
 
 module.exports = { sendSignal };

@@ -1,5 +1,4 @@
-const PostgresDB = require('../../src/db/db');
-const dbService = new PostgresDB();
+const dbService = require('../db/dbInstance');
 
 // ==================== CONFIG ====================
 const COOLDOWN_CONFIG = {

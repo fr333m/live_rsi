@@ -1,5 +1,4 @@
-const PostgresDB = require('../db/db');
-const dbService = new PostgresDB();
+const dbService = require('../db/dbInstance');
 const rsiCache = require('../ws/cacheRSI');
 const { getRsi } = require('./rsi/rsi_value');
 const { getVolatilityLevel } = require('./rsi/getVolatilityLevel');
@@ -95,12 +94,14 @@ async function updateRSIfromCache(interval, concurrency = 12) {
                         symbol,
                         interval,
                         rsiValue,
-                        volatilityData.volatilityForSignal
+                        volatilityData.volatilityForSignal,
+                        volatilityData.volatilityPercent,
+                        volatilityData.atr
                     );
                     updatedCount++;
 
                     logger.debug(
-                        `RSI обновлён → ${symbol} | RSI: ${rsiValue} | Vol: ${volatilityData.volatilityForSignal}`
+                        `RSI обновлён → ${symbol} | RSI: ${rsiValue} | Vol: ${volatilityData.volatilityForSignal}, ${volatilityData.volatilityPercent}`
                     );
                 } else {
                     skippedCount++;

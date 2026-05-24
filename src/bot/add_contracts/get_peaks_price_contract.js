@@ -1,6 +1,6 @@
 const { findMaxima } = require('./find_local_maxima');
-const PostgresDB = require('../../../src/db/db');
-const dbService = new PostgresDB();
+const dbService = require('../../db/dbInstance');
+const { clusterMaxima } = require('./claster_level');
 
 async function getPeaksPriceContracts(symbol, interval) {
     const limit = 300;
@@ -17,9 +17,10 @@ async function getPeaksPriceContracts(symbol, interval) {
     // }
 
     const peaks = await findMaxima(ohlcData, symbol, interval);
+    const filteredPeaks = await clusterMaxima(peaks, symbol, interval);
 
     // console.log(peaks, 'FOR', symbol);
-    return peaks;
+    return filteredPeaks;
 }
 
 module.exports = {

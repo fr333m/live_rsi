@@ -9,12 +9,11 @@ const {
     runUpdateExtremum_for_60m,
 } = require('../signals/update_extremum_on_cache');
 
-const PostgresDB = require('../db/db');
 const BybitClient = require('../rest/bybitRest');
 const priceTracker = require('../ws/wsClient');
 const rsiCache = require('../ws/cacheRSI');
 
-const dbService = new PostgresDB();
+const dbService = require('../db/dbInstance');
 const bybitClient = new BybitClient();
 
 const pLimit = require('p-limit');
@@ -95,6 +94,7 @@ const add35Contracts = async (ctx) => {
         await new Promise((r) => setTimeout(r, 15000));
 
         await Promise.allSettled([
+            runUpdateExtremum_for_1m?.(),
             runUpdateExtremum_for_5m?.(),
             runUpdateExtremum_for_15m?.(),
             runUpdateExtremum_for_60m?.(),

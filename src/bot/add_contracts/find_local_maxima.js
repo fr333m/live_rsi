@@ -1,46 +1,31 @@
 const { formatShort } = require('./transform_timestamp');
 const priceTracker = require('../../ws/wsClient');
 
+const FRACTAL_BARS = 2; // bars on each side (classic Bill Williams = 2)
+
+function isFractalHigh(candles, i) {
+    const high = candles[i].high;
+    for (let j = 1; j <= FRACTAL_BARS; j++) {
+        if (candles[i - j].high >= high || candles[i + j].high >= high)
+            return false;
+    }
+    return true;
+}
+
 async function findMaxima(candles, symbol, interval) {
-    // console.log(`\n=== findMaxima START | ${symbol} | Свечей: ${candles.length} ===`);
+    if (!candles || candles.length < FRACTAL_BARS * 2 + 1) return [];
 
-    if (!candles || candles.length < 30) {
-        // console.log("❌ Мало свечей для анализа максимумов");
-        return [];
-    }
+    const currentPrice = priceTracker.getPrice(symbol)?.lastPrice;
+    if (!currentPrice) return [];
 
-    const lastRecord = priceTracker.getPrice(symbol)?.lastPrice;
-    if (!lastRecord) {
-        // console.log("❌ Нет данных цены в кэше для символа");
-        return [];
-    }
-
-    const currentPrice = lastRecord?.lastPrice;
-
-    // console.log(`Текущая цена: ${currentPrice}`);
-
-    const windowSize = 10; // Больше свечей для 60м, меньше для 15м
     const allLocalMaxs = [];
 
-    // // console.log(`\n=== Поиск локальных максимумов (window = ${windowSize}) ===`);
-
-    for (let i = windowSize; i < candles.length - windowSize; i++) {
+    for (let i = FRACTAL_BARS; i < candles.length - FRACTAL_BARS; i++) {
         const candle = candles[i];
         const high = candle.high;
 
         if (high < currentPrice) continue;
-
-        // Проверка локального максимума
-        let isLocalMax = true;
-        for (let j = i - windowSize; j <= i + windowSize; j++) {
-            if (j === i) continue;
-            if (candles[j].high >= high) {
-                isLocalMax = false;
-                break;
-            }
-        }
-
-        if (!isLocalMax) continue;
+        if (!isFractalHigh(candles, i)) continue;
 
         allLocalMaxs.push({
             ...candle,
@@ -52,17 +37,10 @@ async function findMaxima(candles, symbol, interval) {
         });
     }
 
-    //console.log(`\nНайдено локальных максимумов: ${allLocalMaxs.length}`);
+    if (allLocalMaxs.length === 0) return [];
 
-    if (allLocalMaxs.length === 0) {
-        // console.log("❌ Не найдено ни одного локального максимума");
-        return [];
-    }
-
-    // === Финальная фильтрация: возрастающая последовательность ===
-    const finalMaxima = [allLocalMaxs[allLocalMaxs.length - 1]]; // самый новый максимум
-
-    // console.log(`\nФинальная возрастающая фильтрация...`);
+    // Build ascending resistance sequence (newest → oldest, then reverse)
+    const finalMaxima = [allLocalMaxs[allLocalMaxs.length - 1]];
 
     for (let i = allLocalMaxs.length - 2; i >= 0; i--) {
         const curr = allLocalMaxs[i];
@@ -76,16 +54,10 @@ async function findMaxima(candles, symbol, interval) {
             last.index - curr.index > 4
         ) {
             finalMaxima.push(curr);
-            // console.log(`   ✅ Добавлен: ${curr.dateTime} (+${diffPercent.toFixed(2)}%)`);
-        } else {
-            // console.log(`   ❌ Пропущен: ${curr.dateTime} (разница ${diffPercent.toFixed(2)}%)`);
         }
     }
 
-    const result = finalMaxima.reverse();
-    // console.log(`\n=== findMaxima FINISH | Возвращаем ${result.length} максимумов ===\n`);
-
-    return result;
+    return finalMaxima.reverse();
 }
 
 module.exports = { findMaxima };

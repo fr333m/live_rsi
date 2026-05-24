@@ -1,5 +1,4 @@
-const PostgresDB = require('../db/db');
-const dbService = new PostgresDB();
+const dbService = require('../db/dbInstance');
 const logger = require('../utils/logger');
 
 async function aggregateLastCandle(symbol, targetInterval) {
@@ -26,14 +25,15 @@ async function aggregateLastCandle(symbol, targetInterval) {
         `[aggregateCandles] Запуск агрегации | symbol=${symbol} | targetInterval=${targetInterval} | minutes=${minutes}`
     );
 
-    // Получаем минутные свечи
+    // Получаем минутные свечи с запасом, чтобы при задержке вызова
+    // предыдущий период был представлен полностью
     let minuteCandles;
     try {
         minuteCandles = await dbService.getCandles(
             symbol,
             '1',
             'tracking_contracts',
-            minutes
+            minutes * 2
         );
     } catch (err) {
         logger.error(
@@ -82,14 +82,26 @@ async function aggregateLastCandle(symbol, targetInterval) {
         `[aggregateCandles] Сформировано групп: ${groups.size} | symbol=${symbol} | targetInterval=${targetInterval}`
     );
 
-    // Агрегируем каждую группу в одну свечу
+    // Граница текущего (незавершённого) периода — всё начиная с неё пропускаем
+    const now = Date.now();
+    const currentPeriodStart =
+        Math.floor(now / (minutes * 60 * 1000)) * (minutes * 60 * 1000);
+
+    // Агрегируем только завершённые периоды
     const aggregated = [];
 
     for (const [periodStart, candles] of groups) {
+        if (periodStart >= currentPeriodStart) {
+            logger.debug(
+                `[aggregateCandles] Пропуск текущего периода | period=${new Date(periodStart).toISOString()} | candles=${candles.length} | symbol=${symbol}`
+            );
+            continue;
+        }
+
         const open = candles[0].open;
         const close = candles[candles.length - 1].close;
-        const high = Math.max(...candles.map((c) => c.high));
-        const low = Math.min(...candles.map((c) => c.low));
+        const high = candles.reduce((m, c) => Math.max(m, c.high), -Infinity);
+        const low = candles.reduce((m, c) => Math.min(m, c.low), Infinity);
 
         logger.debug(
             `[aggregateCandles] Свеча [${targetInterval}] | time=${new Date(periodStart).toISOString()} | ` +
@@ -103,6 +115,13 @@ async function aggregateLastCandle(symbol, targetInterval) {
             parseFloat(low),
             parseFloat(close),
         ]);
+    }
+
+    if (aggregated.length === 0) {
+        logger.warn(
+            `[aggregateCandles] Нет завершённых периодов для сохранения | symbol=${symbol} | targetInterval=${targetInterval}`
+        );
+        return;
     }
 
     // Сохраняем агрегированные свечи

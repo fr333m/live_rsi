@@ -1,37 +1,67 @@
 const { sendSignal } = require('../../src/bot/send_signal');
 const { checkActualSignal } = require('./check_actual_signal');
-const PostgresDB = require('../../src/db/db');
-const dbService = new PostgresDB();
+const dbService = require('../db/dbInstance');
 const priceTracker = require('../ws/wsClient');
 const extremumCache = require('../ws/extremumCache');
 const rsiCache = require('../ws/cacheRSI');
+const logger = require('../utils/logger');
 
 async function findSignal(symbol, interval) {
-    const rsiValue = rsiCache.get(symbol, interval);
+    logger.info(`[findSignal] START ${symbol} ${interval}`);
+
+    const rsiValue = rsiCache.get(symbol, '60');
+
+    if (!rsiValue) {
+        logger.warn(
+            `[findSignal] RSI cache not found for ${symbol} ${interval}`
+        );
+        return;
+    }
+
+    logger.info(
+        `[findSignal] RSI: ${rsiValue.rsi} | VolPercent: ${rsiValue.volPrecent}`
+    );
+
+    // ==================== Фильтр по объёму ====================
+    const skipByVolume = rsiValue.rsi < 60 || rsiValue.volPrecent > 35;
+
+    if (skipByVolume && interval === '1') {
+        logger.info(
+            `[findSignal] SKIP by volume filter ${symbol} ${interval} | vol=${rsiValue.volPrecent}`
+        );
+        return;
+    }
 
     try {
         // ==================== 1. Загрузка данных ====================
+        logger.info(`[findSignal] Loading tracking data ${symbol} ${interval}`);
+
         const trackingData = rsiCache.get(symbol, interval);
 
         if (!trackingData || trackingData.length === 0) {
-            console.log(`❌ Нет tracking_contracts для ${symbol} ${interval}`);
+            logger.warn(
+                `[findSignal] No tracking data for ${symbol} ${interval}`
+            );
             return null;
         }
 
         const lastPriceData = priceTracker.getPrice(symbol);
+
         if (!lastPriceData?.lastPrice) {
-            console.log(`❌ Нет последних цен для ${symbol}`);
+            logger.warn(`[findSignal] No last price for ${symbol} ${interval}`);
             return null;
         }
 
         const volatility = trackingData.volatility;
         const lastprice = lastPriceData.lastPrice;
 
-        console.log(
-            `📊 ${symbol} ${interval} | Price: ${lastprice} | Vol: ${volatility}%`
+        logger.info(
+            `[findSignal] ${symbol} ${interval} | Price=${lastprice} | Volatility=${volatility}%`
         );
 
         // ==================== 2. Получение экстремумов ====================
+        logger.info(`[findSignal] Loading extremums ${symbol} ${interval}`);
+
         const [peaks, minima] = await Promise.all([
             extremumCache.get(symbol, interval, 'max_extremum'),
             extremumCache.get(symbol, interval, 'min_extremum'),
@@ -40,27 +70,62 @@ async function findSignal(symbol, interval) {
         const peaksFiltered = peaks || [];
         const minimaFiltered = minima || [];
 
+        logger.info(
+            `[findSignal] Peaks=${peaksFiltered.length} | Minimums=${minimaFiltered.length}`
+        );
+
         if (peaksFiltered.length === 0 && minimaFiltered.length === 0) {
+            logger.info(
+                `[findSignal] No extremums found ${symbol} ${interval}`
+            );
             return false;
         }
 
-        // ==================== 3. Обработка сигналов (ПОСЛЕДОВАТЕЛЬНО) ====================
+        // ==================== 3. Обработка сигналов ====================
 
         const processExtremum = async (extremum, type) => {
+            logger.info(
+                `[processExtremum] Start ${type} | ${symbol} ${interval} | extremumPrice=${extremum.closePrice}`
+            );
+
             const priceDiffPercent =
                 Math.abs((extremum.closePrice - lastprice) / lastprice) * 100;
 
-            if (priceDiffPercent > volatility) return false;
-            if (lastprice > extremum.closePrice && type === 'peak')
+            logger.info(
+                `[processExtremum] Price diff ${priceDiffPercent.toFixed(
+                    4
+                )}% | allowed=${volatility}%`
+            );
+
+            if (priceDiffPercent > volatility) {
+                logger.info(`[processExtremum] SKIP by volatility filter`);
                 return false;
-            if (lastprice < extremum.closePrice && type === 'minimum')
+            }
+
+            if (lastprice > extremum.closePrice && type === 'peak') {
+                logger.info(
+                    `[processExtremum] SKIP peak because current price above extremum`
+                );
                 return false;
+            }
+
+            if (lastprice < extremum.closePrice && type === 'minimum') {
+                logger.info(
+                    `[processExtremum] SKIP minimum because current price below extremum`
+                );
+                return false;
+            }
 
             const signalType = type === 'peak' ? 'double_top' : 'double_bottom';
+
             const signalText =
                 type === 'peak'
                     ? 'Сигнал на продажу (Peak Detected)'
                     : 'Сигнал на покупку (Minimum Detected)';
+
+            logger.info(
+                `[processExtremum] Checking actual signal ${signalType}`
+            );
 
             const isActual = await checkActualSignal(
                 symbol,
@@ -70,7 +135,13 @@ async function findSignal(symbol, interval) {
                 extremum.timestamp
             );
 
+            logger.info(
+                `[processExtremum] checkActualSignal result=${isActual}`
+            );
+
             if (isActual === true) {
+                logger.info(`[processExtremum] SIGNAL CONFIRMED ${signalType}`);
+
                 await sendSignal(
                     symbol,
                     interval,
@@ -83,6 +154,10 @@ async function findSignal(symbol, interval) {
                     rsiValue.rsi
                 );
 
+                logger.info(
+                    `[processExtremum] Signal sent ${symbol} ${interval}`
+                );
+
                 // Удаляем использованный экстремум
                 extremumCache.deleteByIndex(
                     symbol,
@@ -91,171 +166,79 @@ async function findSignal(symbol, interval) {
                     extremum.index
                 );
 
-                console.log(`🚨 СИГНАЛ: ${signalText} | ${symbol} ${interval}`);
+                logger.info(
+                    `[processExtremum] Extremum deleted index=${extremum.index}`
+                );
+
+                logger.info(`🚨 SIGNAL ${signalType} | ${symbol} ${interval}`);
+
                 return true;
             }
+
+            logger.info(`[processExtremum] Signal is not actual`);
 
             return false;
         };
 
         let hasSignal = false;
 
-        // Сначала обрабатываем пики (продажа)
+        // ==================== Обработка пиков ====================
+        logger.info(`[findSignal] Processing peaks ${symbol} ${interval}`);
+
         for (const peak of peaksFiltered) {
             const result = await processExtremum(peak, 'peak').catch((err) => {
-                console.error(`Ошибка обработки пика ${symbol}:`, err);
+                logger.error(
+                    `[findSignal] Peak processing error ${symbol} ${interval}`,
+                    err
+                );
                 return false;
             });
-            if (result) hasSignal = true;
+
+            if (result) {
+                hasSignal = true;
+
+                logger.info(
+                    `[findSignal] Peak signal detected ${symbol} ${interval}`
+                );
+            }
         }
 
-        // Затем обрабатываем минимумы (покупка)
+        // ==================== Обработка минимумов ====================
+        logger.info(`[findSignal] Processing minimums ${symbol} ${interval}`);
+
         for (const min of minimaFiltered) {
             const result = await processExtremum(min, 'minimum').catch(
                 (err) => {
-                    console.error(`Ошибка обработки минимума ${symbol}:`, err);
+                    logger.error(
+                        `[findSignal] Minimum processing error ${symbol} ${interval}`,
+                        err
+                    );
                     return false;
                 }
             );
-            if (result) hasSignal = true;
+
+            if (result) {
+                hasSignal = true;
+
+                logger.info(
+                    `[findSignal] Minimum signal detected ${symbol} ${interval}`
+                );
+            }
         }
+
+        logger.info(
+            `[findSignal] FINISH ${symbol} ${interval} | hasSignal=${hasSignal}`
+        );
 
         return hasSignal;
     } catch (error) {
-        console.error(
-            `❌ Критическая ошибка в findSignal ${symbol} ${interval}:`,
+        logger.error(
+            `[findSignal] CRITICAL ERROR ${symbol} ${interval}`,
             error
         );
+
         return null;
     }
 }
-
-module.exports = { findSignal };
-
-// async function findSignal(symbol, interval) {
-//     const rsiValue = rsiCache.get(symbol, interval);
-
-//     try {
-//         // ==================== 1. Загрузка данных ====================
-//         const trackingData = rsiCache.get(symbol, interval);
-
-//         if (!trackingData || trackingData.length === 0) {
-//             console.log(`❌ Нет tracking_contracts для ${symbol} ${interval}`);
-//             return null;
-//         }
-
-//         const lastPriceData = priceTracker.getPrice(symbol);
-//         if (!lastPriceData?.lastPrice) {
-//             console.log(`❌ Нет последних цен для ${symbol}`);
-//             return null;
-//         }
-
-//         const volatility = trackingData.volatility; // дефолтное значение
-//         const lastprice = lastPriceData.lastPrice;
-
-//         console.log(
-//             `📊 ${symbol} ${interval} | Price: ${lastprice} | Vol: ${volatility}%`
-//         );
-
-//         // ==================== 2. Получение экстремумов ====================
-//         const [peaks, minima] = await Promise.all([
-//             extremumCache.get(symbol, interval, 'max_extremum'),
-//             extremumCache.get(symbol, interval, 'min_extremum'),
-//         ]);
-
-//         const peaksFiltered = peaks || [];
-//         const minimaFiltered = minima || [];
-
-//         if (peaksFiltered.length === 0 && minimaFiltered.length === 0) {
-//             // console.log(`Нет экстремумов для ${symbol} ${interval}`);
-//             return false;
-//         }
-
-//         // ==================== 3. Обработка сигналов ====================
-
-//         const processExtremum = async (extremum, type) => {
-//             const priceDiffPercent =
-//                 Math.abs((extremum.closePrice - lastprice) / lastprice) * 100;
-
-//             if (priceDiffPercent > volatility) return false;
-//             if (lastprice > extremum.closePrice && type === 'peak')
-//                 return false;
-//             if (lastprice < extremum.closePrice && type === 'minimum')
-//                 return false;
-
-//             const signalType = type === 'peak' ? 'double_top' : 'double_bottom';
-//             const signalText =
-//                 type === 'peak'
-//                     ? 'Сигнал на продажу (Peak Detected)'
-//                     : 'Сигнал на покупку (Minimum Detected)';
-
-//             const isActual = await checkActualSignal(
-//                 symbol,
-//                 interval,
-//                 lastPriceData.timestamp,
-//                 signalType,
-//                 extremum.timestamp
-//             );
-
-//             if (isActual === true) {
-//                 await sendSignal(
-//                     symbol,
-//                     interval,
-//                     signalText,
-//                     extremum.dateTime,
-//                     {
-//                         extra: type,
-//                         [type]: extremum, // peak или minimum
-//                     },
-//                     rsiValue.rsi
-//                 );
-
-//                 // Удаляем использованный экстремум
-//                 extremumCache.deleteByIndex(
-//                     symbol,
-//                     interval,
-//                     type === 'peak' ? 'max_extremum' : 'min_extremum',
-//                     extremum.index
-//                 );
-
-//                 console.log(`🚨 СИГНАЛ: ${signalText} | ${symbol} ${interval}`);
-//                 return true;
-//             }
-
-//             return false;
-//         };
-
-//         // ==================== 4. Параллельная обработка ====================
-//         const peakPromises = peaksFiltered.map((peak) =>
-//             processExtremum(peak, 'peak').catch((err) => {
-//                 console.error(`Ошибка обработки пика ${symbol}:`, err);
-//                 return false;
-//             })
-//         );
-
-//         const minimaPromises = minimaFiltered.map((min) =>
-//             processExtremum(min, 'minimum').catch((err) => {
-//                 console.error(`Ошибка обработки минимума ${symbol}:`, err);
-//                 return false;
-//             })
-//         );
-
-//         const [peakResults, minimaResults] = await Promise.all([
-//             Promise.all(peakPromises),
-//             Promise.all(minimaPromises),
-//         ]);
-
-//         const hasSignal =
-//             peakResults.includes(true) || minimaResults.includes(true);
-
-//         return hasSignal;
-//     } catch (error) {
-//         console.error(
-//             `❌ Критическая ошибка в findSignal ${symbol} ${interval}:`,
-//             error
-//         );
-//         return null;
-//     }
-// }
 
 module.exports = { findSignal };

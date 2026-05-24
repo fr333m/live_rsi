@@ -1,5 +1,4 @@
-const PostgresDB = require('../db/db');
-const dbService = new PostgresDB();
+const dbService = require('../db/dbInstance');
 const priceCache = require('../ws/priceCache'); // пока не используется
 const logger = require('../utils/logger');
 
@@ -51,12 +50,14 @@ async function updateOHLC(symbol, interval) {
             return false;
         }
 
-        // Определяем границы текущей свечи по первому тику
-        const candleTimestamp =
-            Math.floor(validData[0].timestamp / intervalMs) * intervalMs;
-        const candleEnd = candleTimestamp + intervalMs;
+        // Определяем границы завершённой минуты по системному времени,
+        // а не по первому тику в кэше — иначе stale-данные сдвигают период
+        const currentPeriodStart =
+            Math.floor(Date.now() / intervalMs) * intervalMs;
+        const candleTimestamp = currentPeriodStart - intervalMs;
+        const candleEnd = currentPeriodStart;
 
-        // Берём только тики текущей свечи
+        // Берём только тики завершённой минуты
         const currentCandleData = validData.filter(
             (item) =>
                 item.timestamp >= candleTimestamp && item.timestamp < candleEnd
@@ -89,8 +90,8 @@ async function updateOHLC(symbol, interval) {
                 `${currentCandleData.length} ticks | Candle TS: ${new Date(candleTimestamp).toISOString()}`
         );
 
-        // Очищаем только тики сохранённой свечи
-        priceCache.clearBySymbol(symbol);
+        // Удаляем тики только завершённой минуты — тики следующей остаются
+        priceCache.clearBefore(symbol, candleEnd);
 
         return true;
     } catch (error) {
@@ -238,10 +239,6 @@ module.exports = { updateOHLC };
 //         return false;
 //     }
 // }
-
-module.exports = {
-    updateOHLC,
-};
 
 // async function updateOHLC(symbol, interval, currentTimestamp) {
 //     try {

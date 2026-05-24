@@ -1,5 +1,4 @@
-const PostgresDB = require('../db/db');
-const dbService = new PostgresDB();
+const dbService = require('../db/dbInstance');
 const { updateOHLC } = require('./updateOHLC_for_1m');
 const priceTracker = require('../ws/wsClient');
 const priceCache = require('../ws/priceCache');
@@ -62,7 +61,7 @@ function startAlignedScheduler() {
             ]);
 
             // === 1-минутные задачи ===
-            if (m % 1 === 0) {
+            if (m % 1 === 0 && sym1.length) {
                 // await saveLivePrice();
 
                 jobQueue.push(async () => {
@@ -70,8 +69,10 @@ function startAlignedScheduler() {
                         await priceTracker.start();
                     } else {
                         for (const symbol of sym1) {
-                            await updateOHLC(symbol, '1', 60000);
+                            await updateOHLC(symbol, '1');
                         }
+                        await updateRSIfromCache('1');
+                        await runUpdateExtremum_for_1m();
                     }
 
                     // await calculationRSI('1');
@@ -144,45 +145,30 @@ function startAlignedScheduler() {
     }
 
     scheduleNextTick();
+
+    setInterval(async () => {
+        const now = Date.now();
+
+        if (priceTracker.ws && priceTracker.ws.readyState === 1) {
+            const tasks = [
+                runSearchSignal_for_1m(now).catch((err) =>
+                    console.error('1m error:', err)
+                ),
+                runSearchSignal_for_5m(now).catch((err) =>
+                    console.error('5m error:', err)
+                ),
+                runSearchSignal_for_15m(now).catch((err) =>
+                    console.error('15m error:', err)
+                ),
+                runSearchSignal_for_60m(now).catch((err) =>
+                    console.error('60m error:', err)
+                ),
+            ];
+
+            await Promise.all(tasks);
+        }
+    }, 7000);
 }
-
-setInterval(async () => {
-    const now = Date.now();
-
-    if (priceTracker.ws && priceTracker.ws.readyState === 1) {
-        const tasks = [
-            runSearchSignal_for_5m(now).catch((err) =>
-                console.error('5m error:', err)
-            ),
-            runSearchSignal_for_15m(now).catch((err) =>
-                console.error('15m error:', err)
-            ),
-            runSearchSignal_for_60m(now).catch((err) =>
-                console.error('60m error:', err)
-            ),
-        ];
-
-        await Promise.all(tasks);
-    }
-}, 7000);
-
-// setInterval(async () => {
-//     if (!priceTracker?.ws?.readyState === 1) return;
-
-//     try {
-//         const now = Date.now();
-//         await Promise.all([
-//             runSearchSignal_for_1m(now).catch(() => {}),
-//             runSearchSignal_for_5m(now).catch(() => {}),
-//             runSearchSignal_for_15m(now).catch(() => {}),
-//             runSearchSignal_for_60m(now).catch(() => {}),
-//         ]);
-//     } catch (e) {
-//         console.error('Signal error:', e);
-//     }
-// }, 5000);
-
-// ====================== Отдельный интервал 5 сек ======================
 
 module.exports = {
     startAlignedScheduler,

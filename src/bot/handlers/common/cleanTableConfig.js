@@ -3,9 +3,7 @@ const {
     getContractsKeyboard,
     getIntervalsKeyboard,
 } = require('../../keyboards');
-const PostgresDB = require('../../../db/db');
-
-const dbService = new PostgresDB();
+const dbService = require('../../../db/dbInstance');
 
 const SYMBOL_REGEX = /^[A-Z0-9]{2,}USDT$/;
 const INTERVAL_REGEX = /^(\d+|1|5|15|30|60|240)(m|h|d|w)?$/i;

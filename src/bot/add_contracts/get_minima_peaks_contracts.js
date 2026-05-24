@@ -1,6 +1,6 @@
 const { findMinima } = require('./find_minima');
-const PostgresDB = require('../../../src/db/db');
-const dbService = new PostgresDB();
+const dbService = require('../../db/dbInstance');
+const { clusterMinima } = require('./claster_level');
 
 async function getMinimaPeaksPriceContracts(symbol, interval) {
     const limit = 300;
@@ -17,10 +17,11 @@ async function getMinimaPeaksPriceContracts(symbol, interval) {
     // }
 
     const peaks = await findMinima(ohlcData, symbol, interval);
+    const filteredPeaks = await clusterMinima(peaks, symbol, interval);
 
     // await dbService.saveFilteredMinimum(symbol, interval, peaks);
     // console.log(peaks, 'FOR MINIMA', symbol);
-    return peaks;
+    return filteredPeaks;
 }
 
 module.exports = {

@@ -1,5 +1,4 @@
-const PostgresDB = require('../db/db');
-const dbService = new PostgresDB();
+const dbService = require('../db/dbInstance');
 const priceTracker = require('../ws/wsClient');
 
 const cleanTableContracts = async (ctx) => {
