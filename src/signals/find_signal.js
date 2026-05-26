@@ -9,7 +9,7 @@ const logger = require('../utils/logger');
 async function findSignal(symbol, interval) {
     logger.info(`[findSignal] START ${symbol} ${interval}`);
 
-    const rsiValue = rsiCache.get(symbol, '60');
+    const rsiValue = rsiCache.get(symbol, interval);
 
     if (!rsiValue) {
         logger.warn(
@@ -23,9 +23,8 @@ async function findSignal(symbol, interval) {
     );
 
     // ==================== Фильтр по объёму ====================
-    const skipByVolume = rsiValue.rsi < 60 || rsiValue.volPrecent > 35;
 
-    if (skipByVolume && interval === '1') {
+    if ((rsiValue.volPrecent < 0.5 && interval === '1') || interval === '5') {
         logger.info(
             `[findSignal] SKIP by volume filter ${symbol} ${interval} | vol=${rsiValue.volPrecent}`
         );
@@ -151,7 +150,8 @@ async function findSignal(symbol, interval) {
                         extra: type,
                         [type]: extremum,
                     },
-                    rsiValue.rsi
+                    rsiValue.rsi,
+                    trackingData.volPrecent
                 );
 
                 logger.info(

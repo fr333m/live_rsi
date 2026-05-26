@@ -25,7 +25,8 @@ async function sendSignal(
     signalType,
     dataTime,
     extraData,
-    rsiValue
+    rsiValue,
+    volPrecent
 ) {
     try {
         // === Генерация двух графиков ===
@@ -44,7 +45,8 @@ async function sendSignal(
                     interval,
                     signalType,
                     dataTime,
-                    rsiValue
+                    rsiValue,
+                    volPrecent
                 ),
                 parse_mode: 'Markdown',
             },
@@ -111,7 +113,14 @@ async function sendSignal(
 }
 
 // Вспомогательная функция для текста сообщения
-function getMessageText(symbol, interval, signalType, dataTime, rsiValue) {
+function getMessageText(
+    symbol,
+    interval,
+    signalType,
+    dataTime,
+    rsiValue,
+    volPrecent
+) {
     return `
 🚨 *RSI TOP ALERT*
 
@@ -120,6 +129,7 @@ function getMessageText(symbol, interval, signalType, dataTime, rsiValue) {
 🔔 Сигнал: *${signalType}*
 ⏱️ Время: *${dataTime}*
 📊 RSI: *${rsiValue}*
+Процент волатильности *${volPrecent}*
 
 📈 Также прикреплён график на 60-минутном таймфрейме.
 

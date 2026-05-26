@@ -89,7 +89,11 @@ async function updateRSIfromCache(interval, concurrency = 12) {
                     getRsi(candles),
                 ]);
 
-                if (rsiValue !== null && (rsiValue >= 60 || rsiValue <= 35)) {
+                if (
+                    rsiValue !== null &&
+                    (rsiValue >= 60 || rsiValue <= 35) &&
+                    volatilityData.volatilityPercent > 0.4
+                ) {
                     rsiCache.set(
                         symbol,
                         interval,
