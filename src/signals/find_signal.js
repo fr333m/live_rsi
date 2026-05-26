@@ -24,7 +24,7 @@ async function findSignal(symbol, interval) {
 
     // ==================== Фильтр по объёму ====================
 
-    if ((rsiValue.volPrecent < 0.5 && interval === '1') || interval === '5') {
+    if (rsiValue.volPrecent < 0.5 && (interval === '1' || interval === '5')) {
         logger.info(
             `[findSignal] SKIP by volume filter ${symbol} ${interval} | vol=${rsiValue.volPrecent}`
         );
@@ -35,15 +35,6 @@ async function findSignal(symbol, interval) {
         // ==================== 1. Загрузка данных ====================
         logger.info(`[findSignal] Loading tracking data ${symbol} ${interval}`);
 
-        const trackingData = rsiCache.get(symbol, interval);
-
-        if (!trackingData || trackingData.length === 0) {
-            logger.warn(
-                `[findSignal] No tracking data for ${symbol} ${interval}`
-            );
-            return null;
-        }
-
         const lastPriceData = priceTracker.getPrice(symbol);
 
         if (!lastPriceData?.lastPrice) {
@@ -51,7 +42,7 @@ async function findSignal(symbol, interval) {
             return null;
         }
 
-        const volatility = trackingData.volatility;
+        const volatility = rsiValue.volatility;
         const lastprice = lastPriceData.lastPrice;
 
         logger.info(
@@ -151,7 +142,7 @@ async function findSignal(symbol, interval) {
                         [type]: extremum,
                     },
                     rsiValue.rsi,
-                    trackingData.volPrecent
+                    rsiValue.volPrecent
                 );
 
                 logger.info(
