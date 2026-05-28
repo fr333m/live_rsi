@@ -33,14 +33,6 @@ async function updateRSIfromCache(interval, concurrency = 12) {
     try {
         logger.info(`Запуск обновления RSI`, logMeta);
 
-        const statusRSIcache = rsiCache.getByInterval(interval);
-        if (statusRSIcache.length > 0) {
-            rsiCache.clearByInterval(interval);
-            logger.debug(
-                `Кэш RSI для интервала ${interval} очищен перед обновлением`
-            );
-        }
-
         const contracts = await dbService.uniqueSymbol(
             'tracking_contracts',
             interval
@@ -90,8 +82,8 @@ async function updateRSIfromCache(interval, concurrency = 12) {
                 ]);
 
                 if (
-                    rsiValue !== null &&
-                    (rsiValue >= 60 || rsiValue <= 35) &&
+                    rsiValue != null &&
+                    volatilityData != null &&
                     volatilityData.volatilityPercent > 0.4
                 ) {
                     rsiCache.set(

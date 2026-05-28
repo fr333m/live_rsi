@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const config = require('../config/config');
 const { generateChart } = require('../chart/generateChart');
-// Убедись что путь правильный
+const logger = require('../utils/logger');
 
 const TELEGRAM_BOT_TOKEN = config.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = config.TELEGRAM_CHAT_ID;
@@ -28,13 +28,19 @@ async function sendSignal(
     rsiValue,
     volPrecent
 ) {
+    logger.info(
+        `[sendSignal] START ${symbol} ${interval} | type=${signalType}`
+    );
+
     try {
-        // === Генерация двух графиков ===
+        // === Генерация графиков ===
+        logger.info(`[sendSignal] Generating main chart ${symbol} ${interval}`);
         const mainChartBuffer = await generateChart(
             symbol,
             interval,
             extraData
         );
+        logger.info(`[sendSignal] Main chart generated ${symbol} ${interval}`);
 
         let charts = [
             {
@@ -52,17 +58,19 @@ async function sendSignal(
             },
         ];
 
-        // Добавляем второй график (60m), если текущий интервал отличается
         if (interval !== '60' && interval !== '60m') {
-            const h1ChartBuffer = await generateChart(symbol, '60', extraData);
-
-            charts.push({
-                type: 'photo',
-                media: h1ChartBuffer,
-            });
+            try {
+                logger.info(`[sendSignal] Generating H1 chart ${symbol}`);
+                const h1ChartBuffer = await generateChart(symbol, '60', extraData);
+                charts.push({ type: 'photo', media: h1ChartBuffer });
+                logger.info(`[sendSignal] H1 chart generated ${symbol}`);
+            } catch (h1err) {
+                logger.warn(
+                    `[sendSignal] H1 chart skipped — no data: ${symbol} | ${h1err.message}`
+                );
+            }
         }
 
-        // Кнопки
         const keyboard = {
             inline_keyboard: [
                 [
@@ -74,19 +82,22 @@ async function sendSignal(
             ],
         };
 
-        // Отправляем как медиагруппу (альбом)
+        logger.info(`[sendSignal] Sending media group to Telegram ${symbol}`);
         const result = await bot.sendMediaGroup(TELEGRAM_CHAT_ID, charts);
+        logger.info(
+            `[sendSignal] Media group sent ${symbol} | messageId=${result[0]?.message_id}`
+        );
 
-        // Отправляем клавиатуру отдельным сообщением (прикрепляем к альбому)
         if (result && result.length > 0) {
             await bot.sendMessage(TELEGRAM_CHAT_ID, 'Выберите действие:', {
                 reply_markup: keyboard,
                 reply_to_message_id: result[0].message_id,
             });
+            logger.info(`[sendSignal] Keyboard message sent ${symbol}`);
         }
 
-        console.log(
-            `✅ Оповещение отправлено для ${symbol} (${interval} + 60m)`
+        logger.info(
+            `[sendSignal] SUCCESS ${symbol} ${interval} | messageId=${result[0]?.message_id}`
         );
 
         return {
@@ -97,9 +108,9 @@ async function sendSignal(
             timestamp: new Date().toISOString(),
         };
     } catch (error) {
-        console.error(
-            `❌ Ошибка при отправке оповещения для ${symbol}:`,
-            error.message
+        logger.error(
+            `[sendSignal] ERROR ${symbol} ${interval} | ${error.message}`,
+            error
         );
 
         return {

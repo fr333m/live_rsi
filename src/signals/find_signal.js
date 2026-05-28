@@ -1,4 +1,4 @@
-const { sendSignal } = require('../../src/bot/send_signal');
+const { sendSignal } = require('../bot/send_signal');
 const { checkActualSignal } = require('./check_actual_signal');
 const dbService = require('../db/dbInstance');
 const priceTracker = require('../ws/wsClient');
@@ -15,21 +15,12 @@ async function findSignal(symbol, interval) {
         logger.warn(
             `[findSignal] RSI cache not found for ${symbol} ${interval}`
         );
-        return;
+        return false;
     }
 
     logger.info(
         `[findSignal] RSI: ${rsiValue.rsi} | VolPercent: ${rsiValue.volPrecent}`
     );
-
-    // ==================== Фильтр по объёму ====================
-
-    if (rsiValue.volPrecent < 0.5 && (interval === '1' || interval === '5')) {
-        logger.info(
-            `[findSignal] SKIP by volume filter ${symbol} ${interval} | vol=${rsiValue.volPrecent}`
-        );
-        return;
-    }
 
     try {
         // ==================== 1. Загрузка данных ====================
@@ -39,7 +30,7 @@ async function findSignal(symbol, interval) {
 
         if (!lastPriceData?.lastPrice) {
             logger.warn(`[findSignal] No last price for ${symbol} ${interval}`);
-            return null;
+            return false;
         }
 
         const volatility = rsiValue.volatility;
@@ -105,6 +96,19 @@ async function findSignal(symbol, interval) {
                 );
                 return false;
             }
+            if (type === 'peak' && rsiValue.rsi <= 55) {
+                logger.info(
+                    `[processExtremum] SKIP peak by RSI filter (rsi=${rsiValue.rsi})`
+                );
+                return false;
+            }
+
+            if (type === 'minimum' && rsiValue.rsi >= 40) {
+                logger.info(
+                    `[processExtremum] SKIP minimum by RSI filter (rsi=${rsiValue.rsi})`
+                );
+                return false;
+            }
 
             const signalType = type === 'peak' ? 'double_top' : 'double_bottom';
 
@@ -129,10 +133,10 @@ async function findSignal(symbol, interval) {
                 `[processExtremum] checkActualSignal result=${isActual}`
             );
 
-            if (isActual === true) {
+            if (isActual) {
                 logger.info(`[processExtremum] SIGNAL CONFIRMED ${signalType}`);
 
-                await sendSignal(
+                const signalResult = await sendSignal(
                     symbol,
                     interval,
                     signalText,
@@ -145,11 +149,18 @@ async function findSignal(symbol, interval) {
                     rsiValue.volPrecent
                 );
 
+                if (!signalResult.success) {
+                    logger.error(
+                        `[processExtremum] Signal send failed ${symbol} ${interval}: ${signalResult.error}`
+                    );
+                    return false;
+                }
+
                 logger.info(
                     `[processExtremum] Signal sent ${symbol} ${interval}`
                 );
 
-                // Удаляем использованный экстремум
+                // Удаляем использованный экстремум только после успешной отправки
                 extremumCache.deleteByIndex(
                     symbol,
                     interval,

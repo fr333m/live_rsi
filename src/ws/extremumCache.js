@@ -180,6 +180,38 @@ class ExtremumCache {
     }
 
     // ---------------------------------------------------------------------------
+    // getByInterval
+    // ---------------------------------------------------------------------------
+    /**
+     * Получить все экстремумы для заданного interval — по всем символам и типам.
+     *
+     * @param {string} interval - Например '1', '5', '15', '60'
+     * @returns {Object[]} Массив объектов { symbol, interval, type, extremums }
+     *
+     * @example
+     * extremumCache.getByInterval('15');
+     * // [
+     * //   { symbol: 'BTCUSDT', interval: '15', type: 'min_extremum', extremums: [...] },
+     * //   { symbol: 'BTCUSDT', interval: '15', type: 'max_extremum', extremums: [...] },
+     * //   { symbol: 'ETHUSDT', interval: '15', type: 'min_extremum', extremums: [...] },
+     * // ]
+     */
+    getByInterval(interval) {
+        if (!interval || typeof interval !== 'string')
+            throw new Error('Invalid interval');
+
+        const result = [];
+        for (const [key, extremums] of this.cache.entries()) {
+            const parts = key.split('_');
+            if (parts[1] !== interval) continue;
+            const symbol = parts[0];
+            const type = parts.slice(2).join('_');
+            result.push({ symbol, interval, type, extremums: [...extremums] });
+        }
+        return result;
+    }
+
+    // ---------------------------------------------------------------------------
     // has
     // ---------------------------------------------------------------------------
     /**

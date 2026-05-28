@@ -71,8 +71,8 @@ function startAlignedScheduler() {
                         for (const symbol of sym1) {
                             await updateOHLC(symbol, '1');
                         }
-                        await updateRSIfromCache('1');
                         await runUpdateExtremum_for_1m();
+                        await updateRSIfromCache('1');
                     }
 
                     // await calculationRSI('1');

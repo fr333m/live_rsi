@@ -12,8 +12,8 @@ const chartJSNodeCanvas = new ChartJSNodeCanvas({
     backgroundColour: BACKGROUND_COLOR,
 });
 
-const CANDLE_WIDTH = 8;
-const MAX_CANDLES = 250;
+const CANDLE_WIDTH = 3;
+const MAX_CANDLES = 350;
 
 // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 

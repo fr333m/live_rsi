@@ -1,3 +1,5 @@
+const dbService = require('../../db/dbInstance');
+
 /**
  * Volatility Level Detector с адаптивным volatilityForSignal
  */
@@ -41,9 +43,9 @@ const RELATIVE_THRESHOLDS = {
  * Индексы: [veryLow, low, mid, high, veryHigh]
  */
 const SIGNAL_MULTIPLIERS = {
-    1: [0.2, 0.5, 0.9, 1.8, 3.2],
-    3: [0.25, 0.48, 0.9, 1.8, 3.2],
-    5: [0.3, 0.45, 0.9, 1.8, 3.2],
+    1: [0.3, 0.7, 1.2, 1.8, 2.5],
+    3: [0.3, 1, 0.9, 1.8, 3.2],
+    5: [0.3, 1, 1.5, 2.0, 3.2],
     15: [0.3, 0.55, 1.1, 2.1, 3.5],
     30: [0.35, 0.7, 1.3, 2.4, 3.8],
     60: [0.4, 0.85, 1.6, 2.8, 4.5],

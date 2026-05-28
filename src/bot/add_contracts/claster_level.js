@@ -1,4 +1,6 @@
 const rsiCache = require('../../ws/cacheRSI');
+const extremumCache = require('../../ws/extremumCache');
+const logger = require('../../utils/logger');
 
 // Two levels belong to the same cluster if their price difference < ATR * ATR_FACTOR
 const ATR_FACTOR = 0.5;
@@ -51,7 +53,7 @@ function clusterMaxima(maxima, symbol, interval) {
     if (aged.length === 0) return [];
     const atr = rsiCache.get(symbol, interval)?.atr;
     if (!atr) return aged;
-    return buildClusters(aged, 'highPrice', atr * ATR_FACTOR);
+    return buildClusters(aged, 'highPrice', atr);
 }
 
 function clusterMinima(minima, symbol, interval) {
@@ -60,7 +62,14 @@ function clusterMinima(minima, symbol, interval) {
     if (aged.length === 0) return [];
     const atr = rsiCache.get(symbol, interval)?.atr;
     if (!atr) return aged;
-    return buildClusters(aged, 'lowPrice', atr * ATR_FACTOR);
+    return buildClusters(aged, 'lowPrice', atr);
 }
 
-module.exports = { clusterMaxima, clusterMinima };
+// ---------------------------------------------------------------------------
+// filterCrossTimeframe
+// ---------------------------------------------------------------------------
+
+module.exports = {
+    clusterMaxima,
+    clusterMinima,
+};

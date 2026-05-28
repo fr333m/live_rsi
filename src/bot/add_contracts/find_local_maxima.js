@@ -57,7 +57,11 @@ async function findMaxima(candles, symbol, interval) {
         }
     }
 
-    return finalMaxima.reverse();
+    const validMax = finalMaxima
+        .reverse()
+        .filter((m) => m.index < candles.length - interval);
+
+    return validMax;
 }
 
 module.exports = { findMaxima };

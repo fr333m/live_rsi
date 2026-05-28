@@ -144,8 +144,40 @@ class PostgresDB {
                 interval        TEXT NOT NULL,
                 type_signal     TEXT NOT NULL,
                 level_timestamp BIGINT,
-                UNIQUE(symbol, timestamp, interval, type_signal, level_timestamp)
+                CONSTRAINT control_send_signal_unique
+                    UNIQUE(symbol, interval, type_signal, level_timestamp)
             );
+        `);
+
+            // Миграция: заменяем старый constraint (включавший timestamp) на правильный
+            await this.query(`
+            DO $$
+            DECLARE r RECORD;
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'control_send_signal_unique'
+                ) THEN
+                    -- Оставляем только последнюю запись на каждую группу сигнала
+                    DELETE FROM control_send_signal
+                    WHERE id NOT IN (
+                        SELECT MAX(id) FROM control_send_signal
+                        GROUP BY symbol, interval, type_signal, level_timestamp
+                    );
+                    -- Удаляем все старые UNIQUE constraints
+                    FOR r IN
+                        SELECT c.conname
+                        FROM pg_constraint c
+                        JOIN pg_class t ON t.oid = c.conrelid
+                        WHERE t.relname = 'control_send_signal' AND c.contype = 'u'
+                    LOOP
+                        EXECUTE format('ALTER TABLE control_send_signal DROP CONSTRAINT %I', r.conname);
+                    END LOOP;
+                    -- Добавляем правильный constraint
+                    ALTER TABLE control_send_signal
+                        ADD CONSTRAINT control_send_signal_unique
+                        UNIQUE (symbol, interval, type_signal, level_timestamp);
+                END IF;
+            END $$;
         `);
 
             console.log(
@@ -232,6 +264,23 @@ class PostgresDB {
     }
 
     // ---------------------------------------------------------------------------
+    // updateSendSignalTimestamp
+    // ---------------------------------------------------------------------------
+    async updateSendSignalTimestamp(id, timestamp) {
+        const normalizedTimestamp = Number(timestamp);
+        if (!Number.isFinite(normalizedTimestamp)) {
+            throw new Error('Timestamp must be a valid number');
+        }
+        const res = await this.query(
+            `UPDATE control_send_signal SET timestamp = $1 WHERE id = $2`,
+            [normalizedTimestamp, id]
+        );
+        if (res.rowCount === 0) {
+            throw new Error(`No signal control record found with id ${id}`);
+        }
+    }
+
+    // ---------------------------------------------------------------------------
     // saveFilteredMinimum
     // ---------------------------------------------------------------------------
     async saveFilteredMinimum(symbol, interval, minima) {
@@ -241,7 +290,7 @@ class PostgresDB {
             for (const min of minima) {
                 await client.query(
                     `
-          INSERT INTO filteredMinimum (symbol, timestamp, price, interval, datetime)
+          INSERT INTO filtered_minimum (symbol, timestamp, price, interval, datetime)
           VALUES ($1, $2, $3, $4, $5)
           ON CONFLICT DO NOTHING
         `,
@@ -344,7 +393,7 @@ class PostgresDB {
 
         if (total < MAX_ROWS) return;
 
-        // Удаляем самые старые записи, оставляем последние 400k
+        // Удаляем самые старые записи, оставляем последние 100k
         await this.query(
             `
     DELETE FROM tracking_contracts

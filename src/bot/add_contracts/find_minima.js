@@ -12,7 +12,7 @@ function isFractalLow(candles, i) {
     return true;
 }
 
-async function findMinima(candles, symbol) {
+async function findMinima(candles, symbol, interval) {
     if (!candles || candles.length < FRACTAL_BARS * 2 + 1) return [];
 
     const currentPrice = priceTracker.getPrice(symbol)?.lastPrice;
@@ -50,14 +50,17 @@ async function findMinima(candles, symbol) {
 
         if (
             curr.lowPrice < last.lowPrice &&
-            diffPercent > 0.08 &&
+            diffPercent > 0.8 &&
             last.index - curr.index > 4
         ) {
             finalMinima.push(curr);
         }
     }
+    const validMins = finalMinima
+        .reverse()
+        .filter((m) => m.index < candles.length - interval);
 
-    return finalMinima.reverse();
+    return validMins;
 }
 
 module.exports = { findMinima };

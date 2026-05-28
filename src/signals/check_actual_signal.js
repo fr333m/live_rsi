@@ -2,7 +2,7 @@ const dbService = require('../db/dbInstance');
 
 // ==================== CONFIG ====================
 const COOLDOWN_CONFIG = {
-    1: 10 * 60 * 1000, // 10 минут
+    1: 5 * 60 * 1000, // 5 минут
     3: 10 * 60 * 1000,
     5: 10 * 60 * 1000, // 10 минут
     15: 30 * 60 * 1000, // 30 минут
@@ -54,17 +54,19 @@ async function checkActualSignal(
 
         // Если записи нет — разрешаем сигнал
         if (!existing) {
-            await dbService.saveSendSignalControl(
+            const saved = await dbService.saveSendSignalControl(
                 symbol,
                 normalizedTimestamp,
                 interval,
                 typeSignal,
                 levelTimeStamp
             );
-            console.log(
-                `[Signal Control] ✅ NEW signal: ${symbol} ${interval} | ${typeSignal} (cooldown ${cooldownMs / 60000} min)`
-            );
-            return true;
+            if (saved) {
+                console.log(
+                    `[Signal Control] ✅ NEW signal: ${symbol} ${interval} | ${typeSignal} (cooldown ${cooldownMs / 60000} min)`
+                );
+            }
+            return saved;
         }
 
         // Если запись есть — проверяем cooldown
@@ -78,20 +80,8 @@ async function checkActualSignal(
             return false;
         }
 
-        // Прошло достаточно времени — обновляем
-        await dbService.removeRowOnSymbol(
-            symbol,
-            'control_send_signal',
-            existing.id
-        );
-
-        await dbService.saveSendSignalControl(
-            symbol,
-            normalizedTimestamp,
-            interval,
-            typeSignal,
-            levelTimeStamp
-        );
+        // Прошло достаточно времени — атомарно обновляем timestamp
+        await dbService.updateSendSignalTimestamp(existing.id, normalizedTimestamp);
 
         console.log(
             `[Signal Control] ✅ Signal allowed after cooldown: ${symbol} ${interval} | ${typeSignal}`
