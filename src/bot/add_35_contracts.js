@@ -1,6 +1,5 @@
-const { getVolatilityLevel } = require('../signals/rsi/getVolatilityLevel');
 const { updateHistoryData } = require('./add_contracts/update_ohlc_in_bybit');
-const { getRsi } = require('../signals/rsi/rsi_value');
+
 const { updateRSIfromCache } = require('../signals/updateRSIcache');
 const {
     runUpdateExtremum_for_1m,
@@ -11,9 +10,7 @@ const {
 
 const BybitClient = require('../rest/bybitRest');
 const priceTracker = require('../ws/wsClient');
-const rsiCache = require('../ws/cacheRSI');
 
-const dbService = require('../db/dbInstance');
 const bybitClient = new BybitClient();
 
 const pLimit = require('p-limit');

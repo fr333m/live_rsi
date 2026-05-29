@@ -258,7 +258,8 @@ class PostgresDB {
 
             // Перебрасываем ошибку дальше, чтобы вызывающая функция могла обработать
             throw new Error(
-                `saveSendSignalControl failed for ${symbol} ${interval} ${typeSignal}: ${error.message}`
+                `saveSendSignalControl failed for ${symbol} ${interval} ${typeSignal}: ${error.message}`,
+                { cause: error }
             );
         }
     }
