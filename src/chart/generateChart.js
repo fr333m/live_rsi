@@ -13,7 +13,7 @@ const chartJSNodeCanvas = new ChartJSNodeCanvas({
 });
 
 const CANDLE_WIDTH = 3;
-const MAX_CANDLES = 350;
+const MAX_CANDLES = 400;
 
 // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 

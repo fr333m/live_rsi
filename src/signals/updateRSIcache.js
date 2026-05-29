@@ -84,7 +84,7 @@ async function updateRSIfromCache(interval, concurrency = 12) {
                 if (
                     rsiValue != null &&
                     volatilityData != null &&
-                    volatilityData.volatilityPercent > 0.4
+                    volatilityData.volatilityPercent > 0.3
                 ) {
                     rsiCache.set(
                         symbol,

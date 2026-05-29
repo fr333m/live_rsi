@@ -1,15 +1,12 @@
-const dbService = require('../../db/dbInstance');
+//=======================================
 
-/**
- * Volatility Level Detector с адаптивным volatilityForSignal
- */
 /**
  * Период ATR для каждого ТФ.
  * Принцип: ~14-20 классических Wilder периодов как база,
  * на мелких ТФ чуть больше для сглаживания шума.
  */
 const ATR_PERIOD_BY_INTERVAL = {
-    1: 30,
+    1: 15, //было 30 для теста поменял на 15
     3: 25,
     5: 20,
     15: 20,
@@ -28,7 +25,6 @@ const HISTORY_WINDOW_FOR_MEDIAN = 100;
 /**
  * Относительные пороги: во сколько раз текущая волатильность
  * отличается от своей медианы за последние N свечей.
- * Универсально для любого инструмента и ТФ.
  */
 const RELATIVE_THRESHOLDS = {
     veryLow: 0.5, // < 0.5x медианы
@@ -44,6 +40,7 @@ const RELATIVE_THRESHOLDS = {
  */
 const SIGNAL_MULTIPLIERS = {
     1: [0.3, 0.7, 1.2, 1.8, 2.5],
+    // ВНИМАНИЕ: low(1.0) > mid(0.9) — немонотонно, вероятно опечатка. Проверь.
     3: [0.3, 1, 0.9, 1.8, 3.2],
     5: [0.3, 1, 1.5, 2.0, 3.2],
     15: [0.3, 0.55, 1.1, 2.1, 3.5],
@@ -97,44 +94,44 @@ function getVolatilityLevel(candles, interval = DEFAULT_INTERVAL) {
         return createUnknownResult(intKey, period);
     }
 
-    // Считаем массив всех ATR значений (нужен для тренда и медианы)
+    // Серия ATR с привязкой к свечам: [{ atr, candleIndex }]
     const atrSeries = calculateAtrSeries(candles, period);
     if (!atrSeries || atrSeries.length < HISTORY_WINDOW_FOR_MEDIAN) {
         return createUnknownResult(intKey, period);
     }
 
-    // Используем close ПРЕДПОСЛЕДНЕЙ закрытой свечи для стабильности сигналов
-    // (последняя может быть live и дёргаться)
-    const referenceCandle =
-        candles[candles.length - 2] || candles[candles.length - 1];
-    const currentPrice = referenceCandle.close;
-
-    if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
-        return createUnknownResult(intKey, period);
-    }
-
-    const currentAtr = atrSeries[atrSeries.length - 1];
-    const volatilityPercent = (currentAtr / currentPrice) * 100;
-
-    // Серия ATR в процентах для расчёта медианы
-    const atrPctSeries = atrSeries
-        .map((atr, i) => {
-            const candle = candles[i + 1]; // atrSeries сдвинут на 1 относительно candles
-            return candle?.close > 0 ? (atr / candle.close) * 100 : 0;
-        })
-        .filter((v) => v > 0);
-
-    const medianAtrPct = getMedian(
-        atrPctSeries.slice(-HISTORY_WINDOW_FOR_MEDIAN)
+    // ATR% серия с КОРРЕКТНОЙ привязкой: каждый ATR делим на close ИМЕННО
+    // его свечи. candleIndex — единственный источник выравнивания.
+    // (calculateAtrSeries уже отбраковал битые свечи, поэтому close валиден.)
+    const atrPctSeries = atrSeries.map(
+        ({ atr, candleIndex }) => (atr / candles[candleIndex].close) * 100
     );
+
+    // Опорная точка — предпоследняя закрытая свеча: последняя может быть live
+    // и дёргаться. Берём и ATR, и цену с ОДНОЙ свечи — без рассинхрона.
+    const refPos =
+        atrSeries.length >= 2 ? atrSeries.length - 2 : atrSeries.length - 1;
+    const refPoint = atrSeries[refPos];
+    const refClose = candles[refPoint.candleIndex].close;
+
+    const currentAtr = refPoint.atr;
+    const volatilityPercent = (currentAtr / refClose) * 100;
+
+    // Медиана «нормали»: последние N значений ATR%, заканчивая опорной точкой
+    // (live-хвост в медиану не попадает).
+    const medianWindow = atrPctSeries.slice(
+        Math.max(0, refPos + 1 - HISTORY_WINDOW_FOR_MEDIAN),
+        refPos + 1
+    );
+    const medianAtrPct = getMedian(medianWindow);
     const relativeRatio =
         medianAtrPct > 0 ? volatilityPercent / medianAtrPct : 1;
 
     // Классификация по относительному порогу
     const levelInfo = classifyByRelative(relativeRatio);
 
-    // Тренд волатильности (расширяется/сжимается)
-    const trend = calculateVolatilityTrend(atrSeries);
+    // Тренд волатильности (по ATR%, до опорной точки включительно)
+    const trend = calculateVolatilityTrend(atrPctSeries, refPos);
 
     // Множитель для сигналов
     const multipliers =
@@ -146,7 +143,7 @@ function getVolatilityLevel(candles, interval = DEFAULT_INTERVAL) {
         description: levelInfo.description,
         volatilityPercent: round(volatilityPercent, 3),
         atr: round(currentAtr, 8),
-        currentPrice: round(currentPrice, 8),
+        currentPrice: round(refClose, 8),
         medianVolatilityPercent: round(medianAtrPct, 3),
         relativeRatio: round(relativeRatio, 2),
         trend, // 'expanding' | 'contracting' | 'stable'
@@ -162,8 +159,15 @@ function getVolatilityLevel(candles, interval = DEFAULT_INTERVAL) {
 // ============================================================
 
 /**
- * Возвращает массив всех значений ATR начиная с первого полного периода.
+ * Возвращает [{ atr, candleIndex }] начиная с первого полного периода.
+ * candleIndex — индекс свечи в исходном массиве, к которой относится это ATR.
  * Использует Wilder's smoothing.
+ *
+ * Выравнивание (фиксируется здесь и только здесь):
+ *  - trValues[k] относится к candles[k + 1];
+ *  - первый ATR = SMA(trValues[0..period-1]) => самый свежий TR в окне
+ *    trValues[period-1] относится к candles[period]  => candleIndex = period;
+ *  - дальше на шаге i используется trValues[i] (candles[i + 1]) => candleIndex = i + 1.
  */
 function calculateAtrSeries(candles, period) {
     const trValues = [];
@@ -174,7 +178,7 @@ function calculateAtrSeries(candles, period) {
 
         if (!isValidCandle(curr) || !Number.isFinite(prev?.close)) {
             // Битая свеча — прерываем расчёт, т.к. Wilder рекурсивный
-            // и дырки искажают результат
+            // и дырки искажают результат.
             return null;
         }
 
@@ -183,23 +187,24 @@ function calculateAtrSeries(candles, period) {
             Math.abs(curr.high - prev.close),
             Math.abs(curr.low - prev.close)
         );
-        trValues.push(tr);
+        trValues.push(tr); // trValues[k] -> candles[k + 1]
     }
 
     if (trValues.length < period) return null;
 
-    const atrSeries = [];
-    // Первое значение — SMA первых N TR
-    let atr = trValues.slice(0, period).reduce((a, b) => a + b, 0) / period;
-    atrSeries.push(atr);
+    const series = [];
 
-    // Дальше — Wilder smoothing
+    // Первое значение — SMA первых N TR, привязано к свече period.
+    let atr = trValues.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    series.push({ atr, candleIndex: period });
+
+    // Дальше — Wilder smoothing, привязка к свече i + 1.
     for (let i = period; i < trValues.length; i++) {
         atr = (atr * (period - 1) + trValues[i]) / period;
-        atrSeries.push(atr);
+        series.push({ atr, candleIndex: i + 1 });
     }
 
-    return atrSeries;
+    return series;
 }
 
 // ============================================================
@@ -215,19 +220,28 @@ function classifyByRelative(ratio) {
 }
 
 /**
- * Тренд волатильности: сравниваем последние 5 значений ATR со средним за 20.
- * 'expanding'   — волатильность растёт (часто = тренд / пробои)
- * 'contracting' — сжимается (часто = накопление перед движением)
- * 'stable'      — без изменений
+ * Тренд волатильности по серии ATR% (не по сырому ATR — иначе растущая цена
+ * сама по себе даёт «expanding»).
+ * Сравниваем последние 5 значений со СОСЕДНИМИ предыдущими 15 (окна не
+ * пересекаются), заканчивая на endPos включительно.
+ *   'expanding'   — волатильность растёт (часто = тренд / пробои)
+ *   'contracting' — сжимается (часто = накопление перед движением)
+ *   'stable'      — без изменений
  */
-function calculateVolatilityTrend(atrSeries) {
-    if (atrSeries.length < 20) return 'stable';
+function calculateVolatilityTrend(series, endPos = series.length - 1) {
+    const RECENT = 5;
+    const BASE = 15;
 
-    const recent = atrSeries.slice(-5);
-    const baseline = atrSeries.slice(-20);
+    const recentEnd = endPos + 1;
+    const recentStart = recentEnd - RECENT;
+    const baseEnd = recentStart;
+    const baseStart = baseEnd - BASE;
 
-    const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
-    const baselineAvg = baseline.reduce((a, b) => a + b, 0) / baseline.length;
+    if (baseStart < 0) return 'stable';
+
+    const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+    const recentAvg = avg(series.slice(recentStart, recentEnd));
+    const baselineAvg = avg(series.slice(baseStart, baseEnd));
 
     if (baselineAvg === 0) return 'stable';
 
@@ -248,7 +262,8 @@ function isValidCandle(candle) {
         Number.isFinite(candle.low) &&
         Number.isFinite(candle.close) &&
         candle.high > 0 &&
-        candle.low > 0
+        candle.low > 0 &&
+        candle.close > 0 // нужно для нормировки ATR% — гарантируем валидность close
     );
 }
 
