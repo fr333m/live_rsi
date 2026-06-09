@@ -1,4 +1,4 @@
-const dbService = require('../db/dbInstance');
+const dbService = require('../db/index');
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 
 // ==================== КОНСТАНТЫ ====================
@@ -80,6 +80,40 @@ async function generateChart(symbol, interval, extraData = {}) {
                     pointRadius: 0,
                     tension: 0.2,
                 },
+                ...(extraData?.macd
+                    ? [
+                          {
+                              label: 'MACD',
+                              data: extraData.macd,
+                              borderColor: '#3b82f6',
+                              borderWidth: 1.5,
+                              pointRadius: 0,
+                              tension: 0,
+                              yAxisID: 'y2',
+                              spanGaps: false,
+                          },
+                          {
+                              label: 'Signal',
+                              data: extraData.signal,
+                              borderColor: '#f43f5e',
+                              borderWidth: 1.5,
+                              pointRadius: 0,
+                              tension: 0,
+                              yAxisID: 'y2',
+                              spanGaps: false,
+                          },
+                          {
+                              label: 'Histogram',
+                              data: extraData.histogram,
+                              borderColor: '#6b7280',
+                              borderWidth: 1,
+                              pointRadius: 0,
+                              tension: 0,
+                              yAxisID: 'y2',
+                              spanGaps: false,
+                          },
+                      ]
+                    : []),
             ],
         },
 
@@ -110,6 +144,10 @@ async function generateChart(symbol, interval, extraData = {}) {
                     max: maxPrice * 1.008,
                     ticks: { color: '#9ca3af' },
                     grid: { color: '#1f2937' },
+                },
+                y2: {
+                    display: false,
+                    position: 'left',
                 },
             },
         },

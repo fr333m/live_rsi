@@ -1,2 +1,0 @@
-const PostgresDB = require('./db');
-
