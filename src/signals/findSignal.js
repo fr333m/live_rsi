@@ -86,50 +86,35 @@ async function findSignal(symbol, interval) {
             // if (lastprice < extremum.closePrice && type === 'minimum')
             //     return false;
 
-            // При неопределённом тренде (ADX < 25) разрешаем сигналы в обе стороны
-            const isUndefinedTrend =
-                (adx15Value !== null && adx15Value < 25) ||
-                (adx60Value !== null && adx60Value < 25);
-
-            if (!isUndefinedTrend) {
-                if (
+            if (interval === '1') {
+                const isUndefinedTrend =
                     (type === 'peak' &&
-                        rsiValue.rsi < 55 &&
-                        extremum.rsi < 55) ||
-                    (type === 'peak' && rsiValue.rsi > 55 && extremum.rsi < 50)
-                ) {
-                    return false;
-                }
-                if (
-                    type === 'peak' &&
-                    interval === '1' &&
-                    rsi15Value !== null &&
-                    rsi60Value !== null &&
-                    rsi15Value < 55 &&
-                    rsi60Value < 55
-                ) {
-                    return false;
-                }
+                        (rsiValue.rsi >= 55 || extremum.rsi >= 50)) ||
+                    (type === 'minimum' &&
+                        (rsiValue.rsi <= 40 || extremum.rsi <= 45)) ||
+                    (adx15Value !== null && adx15Value < 25) ||
+                    (adx60Value !== null && adx60Value < 25);
 
-                if (
-                    (type === 'minimum' &&
-                        rsiValue.rsi > 40 &&
-                        extremum.rsi > 40) ||
-                    (type === 'minimum' &&
-                        rsiValue.rsi < 40 &&
-                        extremum.rsi > 45)
-                ) {
-                    return false;
-                }
-                if (
-                    type === 'minimum' &&
-                    interval === '1' &&
-                    rsi15Value !== null &&
-                    rsi60Value !== null &&
-                    rsi15Value > 40 &&
-                    rsi60Value > 40
-                ) {
-                    return false;
+                if (!isUndefinedTrend) {
+                    if (
+                        rsi15Value !== null &&
+                        rsi60Value !== null &&
+                        type === 'peak' &&
+                        rsi15Value < 55 &&
+                        rsi60Value < 55
+                    ) {
+                        return false;
+                    }
+
+                    if (
+                        rsi15Value !== null &&
+                        rsi60Value !== null &&
+                        type === 'minimum' &&
+                        rsi15Value > 40 &&
+                        rsi60Value > 40
+                    ) {
+                        return false;
+                    }
                 }
             }
 
