@@ -91,9 +91,14 @@ async function findSignal(symbol, interval) {
                     (type === 'peak' &&
                         (rsiValue.rsi >= 55 || extremum.rsi >= 50)) ||
                     (type === 'minimum' &&
-                        (rsiValue.rsi <= 40 || extremum.rsi <= 45)) ||
-                    (adx15Value !== null && adx15Value < 25) ||
-                    (adx60Value !== null && adx60Value < 25);
+                        (rsiValue.rsi <= 40 || extremum.rsi <= 45));
+
+                if (isUndefinedTrend) {
+                    const adxWeak =
+                        (adx15Value !== null && adx15Value < 25) ||
+                        (adx60Value !== null && adx60Value < 25);
+                    if (!adxWeak) return false;
+                }
 
                 if (!isUndefinedTrend) {
                     if (
