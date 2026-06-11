@@ -3,14 +3,20 @@ const dbService = require('../../db/index');
 const { clusterMaxima } = require('./clusterLevel');
 const logger = require('../../utils/logger');
 
-const TRIM_MAP = { 1: 1, 5: 80, 15: 133, 60: 100 };
+const CANDLE_LIMIT = { 1: 200, 5: 400, 15: 700, 60: 700 }; // Количество свечей для анализа экстремумов в зависимости от интервала
+const TRIM_MAP = {
+    1: 1,
+    5: (CANDLE_LIMIT[5] * 1) / 5, // 80
+    15: (CANDLE_LIMIT[15] * 5) / 15, // 133
+    60: (CANDLE_LIMIT[60] * 15) / 60, // 100
+};
 
 async function getPeaksPriceContracts(symbol, interval) {
     const ohlcData = await dbService.getCandles(
         symbol,
         interval,
         'tracking_contracts',
-        400
+        CANDLE_LIMIT[interval]
     );
 
     if (ohlcData.length === 0) return [];

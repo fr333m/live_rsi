@@ -6,37 +6,29 @@ const rsiCache = require('../cache/rsiCache');
 const marketFlowCache = require('../cache/marketFlowCache');
 const { combineSignal } = require('../analysis/flow/cvdTracker');
 const logger = require('../utils/logger');
-const intervals = ['15', '60']; // Интервалы для анализа
-
 async function findSignal(symbol, interval) {
     logger.info(`[findSignal] START ${symbol} ${interval}`);
 
     const rsiValue = rsiCache.get(symbol, interval);
-    const macd15ValueData = rsiCache.get(symbol, '15');
+    const rsi15ValueData = rsiCache.get(symbol, '15');
     const rsi60ValueData = rsiCache.get(symbol, '60');
     let rsi15Value = null;
     let rsi60Value = null;
     let adx15Value = null;
     let adx60Value = null;
-    if (macd15ValueData) {
-        rsi15Value = macd15ValueData.rsi;
-        adx15Value = macd15ValueData.adx;
+    if (rsi15ValueData) {
+        rsi15Value = rsi15ValueData.rsi;
+        adx15Value = rsi15ValueData.adx;
     }
     if (rsi60ValueData) {
         rsi60Value = rsi60ValueData.rsi;
         adx60Value = rsi60ValueData.adx;
     }
-    const adxResult = [
-        `RSI 15m: ${rsi15Value}`,
-        `RSI 60m: ${rsi60Value}`,
-        `ADX 15m: ${adx15Value}`,
-        `ADX 60m: ${adx60Value}`,
-    ].filter((v) => v !== null);
-
-    let adxFilter = null;
-    if (interval === '1') {
-        adxFilter = rsiCache.get(symbol, '60');
-    }
+    const adxResult = [];
+    if (rsi15Value !== null) adxResult.push(`RSI 15m: ${rsi15Value}`);
+    if (rsi60Value !== null) adxResult.push(`RSI 60m: ${rsi60Value}`);
+    if (adx15Value !== null) adxResult.push(`ADX 15m: ${adx15Value}`);
+    if (adx60Value !== null) adxResult.push(`ADX 60m: ${adx60Value}`);
 
     if (!rsiValue) {
         logger.warn(
@@ -46,7 +38,7 @@ async function findSignal(symbol, interval) {
     }
 
     logger.info(
-        `[findSignal] RSI: ${rsiValue.rsi} | VolPercent: ${rsiValue.volPrecent} | adxFilter: ${adxFilter}  `
+        `[findSignal] RSI: ${rsiValue.rsi} | VolPercent: ${rsiValue.volPrecent}`
     );
 
     try {
@@ -76,52 +68,14 @@ async function findSignal(symbol, interval) {
         }
 
         const processExtremum = async (extremum, type) => {
+            const referencePrice =
+                type === 'peak'
+                    ? (extremum.highPrice ?? extremum.closePrice)
+                    : (extremum.lowPrice ?? extremum.closePrice);
             const priceDiffPercent =
-                Math.abs((extremum.closePrice - lastprice) / lastprice) * 100;
+                Math.abs((referencePrice - lastprice) / lastprice) * 100;
 
             if (priceDiffPercent > volatility) return false;
-
-            // if (lastprice > extremum.closePrice && type === 'peak')
-            //     return false;
-            // if (lastprice < extremum.closePrice && type === 'minimum')
-            //     return false;
-
-            if (interval === '1') {
-                const isUndefinedTrend =
-                    (type === 'peak' &&
-                        (rsiValue.rsi >= 55 || extremum.rsi >= 50)) ||
-                    (type === 'minimum' &&
-                        (rsiValue.rsi <= 40 || extremum.rsi <= 45));
-
-                if (isUndefinedTrend) {
-                    const adxWeak =
-                        (adx15Value !== null && adx15Value < 25) ||
-                        (adx60Value !== null && adx60Value < 25);
-                    if (!adxWeak) return false;
-                }
-
-                if (!isUndefinedTrend) {
-                    if (
-                        rsi15Value !== null &&
-                        rsi60Value !== null &&
-                        type === 'peak' &&
-                        rsi15Value < 55 &&
-                        rsi60Value < 55
-                    ) {
-                        return false;
-                    }
-
-                    if (
-                        rsi15Value !== null &&
-                        rsi60Value !== null &&
-                        type === 'minimum' &&
-                        rsi15Value > 40 &&
-                        rsi60Value > 40
-                    ) {
-                        return false;
-                    }
-                }
-            }
 
             // Подтверждение через стакан + CVD (мягкое: не блокирует, только усиливает)
             const tol = lastprice * (volatility / 100);
@@ -236,3 +190,41 @@ async function findSignal(symbol, interval) {
 }
 
 module.exports = { findSignal };
+
+// if (interval === '1') {
+//                 const isUndefinedTrend =
+//                     (type === 'peak' &&
+//                         rsiValue.rsi >= 50 &&
+//                         extremum.rsi >= 50) ||
+//                     (type === 'minimum' &&
+//                         rsiValue.rsi <= 40 &&
+//                         extremum.rsi <= 40);
+
+//                 if (isUndefinedTrend) {
+//                     const adxWeak =
+//                         (adx15Value !== null && adx15Value < 25) ||
+//                         (adx60Value !== null && adx60Value < 25);
+//                     if (!adxWeak) return false;
+//                 }
+
+//                 if (!isUndefinedTrend) {
+//                     if (
+//                         rsi15Value !== null &&
+//                         rsi60Value !== null &&
+//                         type === 'peak' &&
+//                         rsi15Value < 55 &&
+//                         rsi60Value < 55
+//                     ) {
+//                         return false;
+//                     }
+//                     if (
+//                         rsi15Value !== null &&
+//                         rsi60Value !== null &&
+//                         type === 'minimum' &&
+//                         rsi15Value > 40 &&
+//                         rsi60Value > 40
+//                     ) {
+//                         return false;
+//                     }
+//                 }
+//             }
