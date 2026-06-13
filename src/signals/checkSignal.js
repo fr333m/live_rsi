@@ -14,8 +14,15 @@ const COOLDOWN_CONFIG = {
 
 const DEFAULT_COOLDOWN = 60 * 60 * 1000;
 
-async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelTimeStamp) {
-    if (!symbol?.trim() || !interval?.trim()) throw new Error('symbol and interval are required');
+async function checkActualSignal(
+    symbol,
+    interval,
+    timestamp,
+    typeSignal,
+    levelTimeStamp
+) {
+    if (!symbol?.trim() || !interval?.trim())
+        throw new Error('symbol and interval are required');
     if (!typeSignal?.trim()) throw new Error('typeSignal is required');
     if (!levelTimeStamp) throw new Error('levelTimeStamp is required');
 
@@ -30,9 +37,7 @@ async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelT
         const existing = await dbService.checkRowForTypeSignal(
             symbol,
             interval,
-            typeSignal,
-            'control_send_signal',
-            String(levelTimeStamp)
+            'control_send_signal'
         );
 
         if (!existing) {
@@ -41,7 +46,7 @@ async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelT
                 normalizedTimestamp,
                 interval,
                 typeSignal,
-                levelTimeStamp
+                String(levelTimeStamp)
             );
             if (saved) {
                 console.log(
@@ -61,13 +66,19 @@ async function checkActualSignal(symbol, interval, timestamp, typeSignal, levelT
             return false;
         }
 
-        await dbService.updateSendSignalTimestamp(existing.id, normalizedTimestamp);
+        await dbService.updateSendSignalTimestamp(
+            existing.id,
+            normalizedTimestamp
+        );
         console.log(
             `[Signal Control] ✅ Signal allowed after cooldown: ${symbol} ${interval} | ${typeSignal}`
         );
         return true;
     } catch (error) {
-        console.error(`[Signal Control Error] ${symbol} ${interval} ${typeSignal}:`, error);
+        console.error(
+            `[Signal Control Error] ${symbol} ${interval} ${typeSignal}:`,
+            error
+        );
         throw error;
     }
 }

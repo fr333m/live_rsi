@@ -1,6 +1,7 @@
 const { findMinima } = require('./findMinima');
 const dbService = require('../../db/index');
 const { clusterMinima } = require('./clusterLevel');
+const rsiCache = require('../../cache/rsiCache');
 const logger = require('../../utils/logger');
 
 // Чтобы добавить новый TF — достаточно добавить его в оба объекта ниже.
@@ -31,7 +32,8 @@ async function getMinimaPeaksPriceContracts(symbol, interval) {
     if (trimCount === undefined)
         throw new Error(`Unsupported interval: ${interval}`);
 
-    const peaks = await findMinima(ohlcData, symbol, trimCount);
+    const atr = rsiCache.get(symbol, interval)?.atr || 0;
+    const peaks = await findMinima(ohlcData, symbol, trimCount, atr, interval);
 
     logger.debug(
         `[${symbol} ${interval}m] findMinima found ${peaks.length} extrema`,
@@ -42,7 +44,7 @@ async function getMinimaPeaksPriceContracts(symbol, interval) {
         }))
     );
 
-    const filteredPeaks = await clusterMinima(peaks, symbol, interval);
+    const filteredPeaks = await clusterMinima(peaks);
 
     logger.debug(
         `[${symbol} ${interval}m] after clusterMinima: ${filteredPeaks.length} extrema`,

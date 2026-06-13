@@ -77,6 +77,19 @@ async function findSignal(symbol, interval) {
 
             if (priceDiffPercent > volatility) return false;
 
+            if (interval === '1') {
+                const isUndefinedTrend =
+                    (rsi60Value !== null &&
+                        (rsi60Value >= 60 || rsi60Value <= 40)) ||
+                    (adx60Value !== null && adx60Value <= 25);
+                if (!isUndefinedTrend) {
+                    logger.info(
+                        `[processExtremum] Skipping signal due to undefined trend ${symbol} ${interval}`
+                    );
+                    return false;
+                }
+            }
+
             // Подтверждение через стакан + CVD (мягкое: не блокирует, только усиливает)
             const tol = lastprice * (volatility / 100);
             const flowData = marketFlowCache.get(symbol);

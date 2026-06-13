@@ -40,4 +40,35 @@ function getRsi(candlesArr) {
     return 100 - 100 / (1 + rs);
 }
 
-module.exports = { getRsi };
+// Wilder RSI для всего массива свечей за один проход — O(n)
+function computeAllRsi(candles) {
+    const period = 14;
+    const rsiValues = new Array(candles.length).fill(null);
+    if (candles.length < period + 1) return rsiValues;
+
+    let avgGain = 0;
+    let avgLoss = 0;
+
+    for (let i = 1; i <= period; i++) {
+        const diff = candles[i].close - candles[i - 1].close;
+        if (diff > 0) avgGain += diff;
+        else avgLoss += Math.abs(diff);
+    }
+    avgGain /= period;
+    avgLoss /= period;
+
+    rsiValues[period] =
+        avgLoss === 0 ? 100 : avgGain === 0 ? 0 : 100 - 100 / (1 + avgGain / avgLoss);
+
+    for (let i = period + 1; i < candles.length; i++) {
+        const diff = candles[i].close - candles[i - 1].close;
+        avgGain = (avgGain * (period - 1) + Math.max(diff, 0)) / period;
+        avgLoss = (avgLoss * (period - 1) + Math.max(-diff, 0)) / period;
+        rsiValues[i] =
+            avgLoss === 0 ? 100 : avgGain === 0 ? 0 : 100 - 100 / (1 + avgGain / avgLoss);
+    }
+
+    return rsiValues;
+}
+
+module.exports = { getRsi, computeAllRsi };

@@ -1,41 +1,49 @@
 const { formatShort } = require('./transformTimestamp');
-const priceTracker = require('../../ws/priceTracker');
-const { getRsi } = require('../rsi/rsiCalc');
+const { computeAllRsi } = require('../rsi/rsiCalc');
 
-const FRACTAL_BARS = 2;
+const FRACTAL_BARS = {
+    1: 5,
+    3: 2,
+    5: 2,
+    15: 2,
+    30: 2,
+    60: 2,
+    240: 2,
+    D: 2,
+};
 
-function isFractalLow(candles, i) {
+function isFractalLow(candles, i, timeframe) {
     const low = candles[i].low;
-    for (let j = 1; j <= FRACTAL_BARS; j++) {
+    for (let j = 1; j <= FRACTAL_BARS[timeframe]; j++) {
         if (candles[i - j].low <= low || candles[i + j].low <= low)
             return false;
     }
     return true;
 }
 
-async function findMinima(candles, symbol, interval) {
-    if (!candles || candles.length < FRACTAL_BARS * 2 + 1) return [];
+async function findMinima(candles, symbol, interval, atr = 0, timeframe) {
+    if (!candles || candles.length < FRACTAL_BARS[timeframe] * 2 + 1) return [];
 
-    const currentPrice = priceTracker.getPrice(symbol)?.lastPrice;
-    if (!currentPrice) return [];
-
+    const rsiValues = computeAllRsi(candles);
     const allLocalMins = [];
 
-    for (let i = FRACTAL_BARS; i < candles.length - FRACTAL_BARS; i++) {
+    for (
+        let i = FRACTAL_BARS[timeframe];
+        i < candles.length - FRACTAL_BARS[timeframe];
+        i++
+    ) {
         const candle = candles[i];
-        const low = candle.low;
 
-        if (low > currentPrice) continue;
-        if (!isFractalLow(candles, i)) continue;
+        if (!isFractalLow(candles, i, timeframe)) continue;
 
         allLocalMins.push({
             ...candle,
-            lowPrice: low,
+            lowPrice: candle.low,
             closePrice: candle.close,
             dateTime: formatShort(candle.timestamp),
             timestamp: candle.timestamp,
             index: i,
-            rsi: getRsi(candles.slice(0, i + 1)),
+            rsi: rsiValues[i],
         });
     }
 
@@ -46,13 +54,13 @@ async function findMinima(candles, symbol, interval) {
     for (let i = allLocalMins.length - 2; i >= 0; i--) {
         const curr = allLocalMins[i];
         const last = finalMinima[finalMinima.length - 1];
-        const diffPercent =
-            ((last.lowPrice - curr.lowPrice) / last.lowPrice) * 100;
+        const priceDiff = last.lowPrice - curr.lowPrice;
+        const threshold = atr > 0 ? atr * 0.5 : last.lowPrice * 0.008;
 
         if (
             curr.lowPrice < last.lowPrice &&
-            diffPercent > 0.8 &&
-            last.index - curr.index > 4
+            priceDiff > threshold &&
+            last.index - curr.index > 3
         ) {
             finalMinima.push(curr);
         }

@@ -130,22 +130,20 @@ function startAlignedScheduler() {
         const now = Date.now();
 
         if (priceTracker.ws && priceTracker.ws.readyState === 1) {
-            await Promise.all([
-                runSearchSignal_for_1m(now).catch((err) =>
-                    console.error('1m signal error:', err)
-                ),
-                runSearchSignal_for_5m(now).catch((err) =>
-                    console.error('5m signal error:', err)
-                ),
-                runSearchSignal_for_15m(now).catch((err) =>
-                    console.error('15m signal error:', err)
-                ),
-                runSearchSignal_for_60m(now).catch((err) =>
-                    console.error('60m signal error:', err)
-                ),
-            ]);
+            await runSearchSignal_for_1m(now).catch((err) =>
+                console.error('1m signal error:', err)
+            );
+            await runSearchSignal_for_5m(now).catch((err) =>
+                console.error('5m signal error:', err)
+            );
+            await runSearchSignal_for_15m(now).catch((err) =>
+                console.error('15m signal error:', err)
+            );
+            await runSearchSignal_for_60m(now).catch((err) =>
+                console.error('60m signal error:', err)
+            );
         }
-    }, 7000);
+    }, 17000);
 }
 
 module.exports = { startAlignedScheduler };

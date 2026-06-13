@@ -794,13 +794,7 @@ class PostgresDB {
     // ---------------------------------------------------------------------------
     // checkRowForTypeSignal
     // ---------------------------------------------------------------------------
-    async checkRowForTypeSignal(
-        symbol,
-        interval,
-        typeSignal,
-        tableName,
-        levelTimeStamp
-    ) {
+    async checkRowForTypeSignal(symbol, interval, tableName) {
         // Защита от SQL-инъекции через имя таблицы
         if (!/^[A-Za-z0-9_]+$/.test(tableName)) {
             throw new Error('Invalid table name');
@@ -810,14 +804,17 @@ class PostgresDB {
         SELECT * 
         FROM ${tableName} 
         WHERE symbol = $1 
-          AND interval = $2 
-          AND type_signal = $3
+          AND interval = $2
     `;
-        const params = [symbol, interval, typeSignal];
-        if (levelTimeStamp !== null) {
-            params.push(levelTimeStamp);
-            query += ` AND level_timestamp = $4`;
-        }
+        const params = [symbol, interval];
+        // if (typeSignal !== null) {
+        //     params.push(typeSignal);
+        //     query += ` AND type_signal = $3`;
+        // }
+        // if (levelTimeStamp !== null) {
+        //     params.push(levelTimeStamp);
+        //     query += ` AND level_timestamp = $4`;
+        // }
 
         query += ` ORDER BY timestamp DESC LIMIT 1`;
 
