@@ -20,11 +20,11 @@ const LOG_LEVELS = {
 
 // ===== ОТКЛЮЧИТЬ ЛОГИРОВАНИЕ =====
 // Измени на false чтобы отключить логи
-const LOGGING_ENABLED = true;
+const LOGGING_ENABLED = false;
 // ==================================
 
 // Текущий уровень логирования (можно менять через переменную окружения)
-const CURRENT_LOG_LEVEL = LOG_LEVELS[process.env.LOG_LEVEL || 'DEBUG'];
+const CURRENT_LOG_LEVEL = LOG_LEVELS[process.env.LOG_LEVEL || 'INFO'];
 
 /**
  * Форматирует сообщение логирования

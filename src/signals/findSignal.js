@@ -76,6 +76,10 @@ async function findSignal(symbol, interval) {
                 Math.abs((referencePrice - lastprice) / lastprice) * 100;
 
             if (priceDiffPercent > volatility) return false;
+            if (type === 'peak' && extremum.closePrice > lastprice)
+                return false;
+            if (type === 'minimum' && extremum.closePrice < lastprice)
+                return false;
 
             if (interval === '1') {
                 const isUndefinedTrend =
