@@ -1,8 +1,9 @@
 const { formatShort } = require('./transformTimestamp');
 const { computeAllRsi } = require('../rsi/rsiCalc');
+const priceTracker = require('../../ws/priceTracker');
 
 const FRACTAL_BARS = {
-    1: 5,
+    1: 3,
     3: 2,
     5: 2,
     15: 2,
@@ -22,6 +23,8 @@ function isFractalLow(candles, i, timeframe) {
 }
 
 async function findMinima(candles, symbol, interval, atr = 0, timeframe) {
+    const lastPriceData = priceTracker.getPrice(symbol);
+    const lastPrice = lastPriceData?.lastPrice || 0;
     if (!candles || candles.length < FRACTAL_BARS[timeframe] * 2 + 1) return [];
 
     const rsiValues = computeAllRsi(candles);
@@ -56,6 +59,8 @@ async function findMinima(candles, symbol, interval, atr = 0, timeframe) {
         const last = finalMinima[finalMinima.length - 1];
         const priceDiff = last.lowPrice - curr.lowPrice;
         const threshold = atr > 0 ? atr * 0.5 : last.lowPrice * 0.008;
+
+        if (curr.closePrice > lastPrice) continue;
 
         if (
             curr.lowPrice < last.lowPrice &&
