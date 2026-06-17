@@ -5,6 +5,7 @@ const extremumCache = require('../cache/extremumCache');
 const rsiCache = require('../cache/rsiCache');
 const marketFlowCache = require('../cache/marketFlowCache');
 const { combineSignal } = require('../analysis/flow/cvdTracker');
+const { levelPriceDiff } = require('../analysis/rsi/volatilityLevel');
 const logger = require('../utils/logger');
 async function findSignal(symbol, interval) {
     logger.info(`[findSignal] START ${symbol} ${interval}`);
@@ -49,7 +50,7 @@ async function findSignal(symbol, interval) {
             return false;
         }
 
-        const volatility = rsiValue.volatility;
+        const volatility = levelPriceDiff(rsiValue.volPrecent, interval);
         const lastprice = lastPriceData.lastPrice;
 
         const [peaks, minima] = await Promise.all([
@@ -69,33 +70,14 @@ async function findSignal(symbol, interval) {
 
         const processExtremum = async (extremum, type) => {
             const referencePrice =
-                type === 'peak'
-                    ? (extremum.highPrice ?? extremum.closePrice)
-                    : (extremum.lowPrice ?? extremum.closePrice);
+                type === 'peak' ? extremum.closePrice : extremum.closePrice;
             const priceDiffPercent =
                 Math.abs((referencePrice - lastprice) / lastprice) * 100;
 
             if (priceDiffPercent > volatility) return false;
-            if (type === 'peak' && extremum.closePrice > lastprice)
-                return false;
-            if (type === 'minimum' && extremum.closePrice < lastprice)
-                return false;
-
-            if (interval === '1') {
-                const isUndefinedTrend =
-                    (rsi60Value !== null &&
-                        (rsi60Value >= 60 || rsi60Value <= 40)) ||
-                    (adx60Value !== null && adx60Value <= 25);
-                if (!isUndefinedTrend) {
-                    logger.info(
-                        `[processExtremum] Skipping signal due to undefined trend ${symbol} ${interval}`
-                    );
-                    return false;
-                }
-            }
 
             // Подтверждение через стакан + CVD (мягкое: не блокирует, только усиливает)
-            const tol = lastprice * (volatility / 100);
+            const tol = lastprice * (rsiValue.volPrecent / 100);
             const flowData = marketFlowCache.get(symbol);
             let flowSignal = null;
             if (flowData) {
@@ -149,7 +131,8 @@ async function findSignal(symbol, interval) {
                 rsiValue.volPrecent,
                 flowSignal,
                 extremum.rsi,
-                adxResult
+                adxResult,
+                extremum.prominance
             );
 
             if (!signalResult.success) {
@@ -209,6 +192,18 @@ async function findSignal(symbol, interval) {
 module.exports = { findSignal };
 
 // if (interval === '1') {
+//     const isUndefinedTrend =
+//         (rsi60Value !== null && (rsi60Value >= 60 || rsi60Value <= 40)) ||
+//         (adx60Value !== null && adx60Value <= 25);
+//     if (!isUndefinedTrend) {
+//         logger.info(
+//             `[processExtremum] Skipping signal due to undefined trend ${symbol} ${interval}`
+//         );
+//         return false;
+//     }
+// }
+
+//  if (interval === '1') {
 //                 const isUndefinedTrend =
 //                     (type === 'peak' &&
 //                         rsiValue.rsi >= 50 &&

@@ -19,6 +19,11 @@ const TRIM_MAP = Object.fromEntries(
 );
 
 async function getMinimaPeaksPriceContracts(symbol, interval) {
+    const volPrecentData = rsiCache.get(symbol, interval);
+    const volPrecent = volPrecentData.volPrecent;
+    if (interval === '1' && volPrecent <= 0.15) {
+        return [];
+    }
     const ohlcData = await dbService.getCandles(
         symbol,
         interval,
@@ -29,10 +34,12 @@ async function getMinimaPeaksPriceContracts(symbol, interval) {
     if (ohlcData.length === 0) return [];
 
     const trimCount = TRIM_MAP[interval];
+
     if (trimCount === undefined)
         throw new Error(`Unsupported interval: ${interval}`);
 
     const atr = rsiCache.get(symbol, interval)?.atr || 0;
+
     const peaks = await findMinima(ohlcData, symbol, trimCount, atr, interval);
 
     logger.debug(
@@ -41,10 +48,12 @@ async function getMinimaPeaksPriceContracts(symbol, interval) {
             price: p.lowPrice,
             date: p.dateTime,
             index: p.index,
+            rsi: p.rsi,
+            prominance: p.prominance,
         }))
     );
 
-    const filteredPeaks = await clusterMinima(peaks);
+    const filteredPeaks = clusterMinima(peaks);
 
     logger.debug(
         `[${symbol} ${interval}m] after clusterMinima: ${filteredPeaks.length} extrema`,
@@ -52,10 +61,12 @@ async function getMinimaPeaksPriceContracts(symbol, interval) {
             price: p.lowPrice,
             date: p.dateTime,
             index: p.index,
+            rsi: p.rsi,
+            prominance: p.prominance,
         }))
     );
 
-    return filteredPeaks;
+    return peaks;
 }
 
 module.exports = { getMinimaPeaksPriceContracts };

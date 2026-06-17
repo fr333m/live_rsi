@@ -126,24 +126,45 @@ function startAlignedScheduler() {
 
     scheduleNextTick();
 
-    setInterval(async () => {
+    const SIGNAL_INTERVAL = 17_000;
+    let isSignalRunning = false;
+
+    async function runSignals() {
+        if (isSignalRunning) return;
+        if (!priceTracker.ws || priceTracker.ws.readyState !== 1) {
+            scheduleNextSignal();
+            return;
+        }
+
+        isSignalRunning = true;
         const now = Date.now();
 
-        if (priceTracker.ws && priceTracker.ws.readyState === 1) {
-            await runSearchSignal_for_1m(now).catch((err) =>
-                console.error('1m signal error:', err)
-            );
-            await runSearchSignal_for_5m(now).catch((err) =>
-                console.error('5m signal error:', err)
-            );
-            await runSearchSignal_for_15m(now).catch((err) =>
-                console.error('15m signal error:', err)
-            );
-            await runSearchSignal_for_60m(now).catch((err) =>
-                console.error('60m signal error:', err)
-            );
+        try {
+            await Promise.allSettled([
+                runSearchSignal_for_1m(now).catch((err) =>
+                    console.error('1m signal error:', err)
+                ),
+                runSearchSignal_for_5m(now).catch((err) =>
+                    console.error('5m signal error:', err)
+                ),
+                runSearchSignal_for_15m(now).catch((err) =>
+                    console.error('15m signal error:', err)
+                ),
+                runSearchSignal_for_60m(now).catch((err) =>
+                    console.error('60m signal error:', err)
+                ),
+            ]);
+        } finally {
+            isSignalRunning = false;
+            scheduleNextSignal();
         }
-    }, 17000);
+    }
+
+    function scheduleNextSignal() {
+        setTimeout(runSignals, SIGNAL_INTERVAL);
+    }
+
+    scheduleNextSignal();
 }
 
 module.exports = { startAlignedScheduler };

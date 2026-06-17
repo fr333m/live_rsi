@@ -63,7 +63,8 @@ async function sendSignal(
     volPrecent,
     flowSignal = null,
     rsiLevel = null,
-    macd15Value = null
+    macd15Value = null,
+    prominance
 ) {
     const extraDataByTf = null; // --- IGNORE --- пока не используем, но оставляем возможность
     logger.info(
@@ -116,7 +117,8 @@ async function sendSignal(
             flowSignal,
             rsiLevel,
             macd15Value,
-            attachedExtras
+            attachedExtras,
+            prominance
         );
 
         const charts = rendered.map((r, idx) =>
@@ -195,7 +197,8 @@ function getMessageText(
     flowSignal = null,
     rsiLevel = null,
     macd15Value = null,
-    extraTfs = []
+    extraTfs = [],
+    prominance
 ) {
     let confirmLine = '';
     if (flowSignal) {
@@ -224,6 +227,7 @@ function getMessageText(
 📊 RSI: *${rsiValue}*
 📊 RSI Level: *${rsiLevel}*
 📊 MACD 15: *${macd15Value}*
+📊 Prominance Lvel: *${prominance}*
 Процент волатильности *${volPrecent}*${confirmLine}${chartsLine}`.trim();
 }
 

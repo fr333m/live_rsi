@@ -1,4 +1,4 @@
-const MIN_AGE_BARS = 10;
+const MIN_AGE_BARS = 15;
 
 function filterByAge(levels) {
     if (levels.length === 0) return [];

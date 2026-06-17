@@ -27,27 +27,32 @@ const HISTORY_WINDOW_FOR_MEDIAN = 100;
  * отличается от своей медианы за последние N свечей.
  */
 const RELATIVE_THRESHOLDS = {
-    veryLow: 0.5, // < 0.5x медианы
-    low: 0.8, // < 0.8x
-    mid: 1.3, // < 1.3x
-    high: 2.0, // < 2.0x
-    // выше — очень высокий
+    veryLow: 0.1, // ratio < 0.1   -> veryLow
+    low: 0.3, // ratio < 0.3   -> low
+    mid: 0.5, // ratio < 0.5   -> mid
+    high: 0.8, // ratio < 0.8   -> high
+    midHigh: 1.2, // ratio < 1.2   -> midHigh
+    upMidleHigh: 1.6, // ratio < 1.6   -> upMidleHigh
+    veryHigh: 2, // ratio < 2.0   -> veryHigh
+
+    // ratio >= 2.0 -> extreme
 };
 
 /**
  * Множители для volatilityForSignal по ТФ.
- * Индексы: [veryLow, low, mid, high, veryHigh]
+ * Индексы: [veryLow, low, mid, high, midHigh, upMidleHigh, veryHigh, extreme]
+ * midHigh/upMidleHigh — линейная интерполяция между high и veryHigh (старые
+ * значения), extreme — экстраполяция тем же шагом за veryHigh.
  */
 const SIGNAL_MULTIPLIERS = {
-    1: [0.3, 0.5, 0.8, 1.2, 1.8],
-    // ВНИМАНИЕ: low(1.0) > mid(0.9) — немонотонно, вероятно опечатка. Проверь.
-    3: [0.3, 0.5, 0.8, 1.2, 1.8],
-    5: [0.3, 0.5, 0.8, 1.2, 1.8],
-    15: [0.3, 0.55, 0.8, 1.2, 1.8],
-    30: [0.35, 0.7, 1.3, 2.4, 3.8],
-    60: [0.4, 0.5, 0.8, 1.2, 1.8],
-    240: [0.4, 0.85, 1.6, 2.8, 4.5],
-    D: [0.5, 1.1, 2.0, 3.5, 6.0],
+    1: [0.1, 0.2, 0.3, 0.5, 0.8, 1.2, 1.8, 2.0],
+    3: [0.15, 0.25, 0.4, 0.5, 0.8, 1.2, 1.8, 2.0],
+    5: [0.1, 0.2, 0.3, 0.5, 0.8, 1.2, 1.8, 2.0],
+    15: [0.2, 0.35, 0.6, 1.0, 1.4, 1.6, 1.8, 2.0],
+    30: [0.35, 0.7, 1.3, 2.4, 2.87, 3.33, 3.8, 4.27],
+    60: [0.4, 0.5, 0.8, 1.2, 1.4, 1.6, 1.8, 2.0],
+    240: [0.4, 0.85, 1.6, 2.8, 3.37, 3.93, 4.5, 5.07],
+    D: [0.5, 1.1, 2.0, 3.5, 4.33, 5.17, 6.0, 6.83],
 };
 
 const DEFAULT_INTERVAL = '15';
@@ -69,10 +74,25 @@ const LEVEL_LABELS = {
         description: 'Повышенная волатильность',
         index: 3,
     },
+    midHigh: {
+        level: 'умеренно высокий',
+        description: 'Заметно повышенная волатильность',
+        index: 4,
+    },
+    upMidleHigh: {
+        level: 'сильно повышенный',
+        description: 'Сильно повышенная волатильность',
+        index: 5,
+    },
     veryHigh: {
         level: 'очень высокий',
         description: 'Экстремальная волатильность',
-        index: 4,
+        index: 6,
+    },
+    extreme: {
+        level: 'экстремальный',
+        description: 'Экстремально высокая волатильность',
+        index: 7,
     },
 };
 
@@ -216,7 +236,11 @@ function classifyByRelative(ratio) {
     if (ratio < RELATIVE_THRESHOLDS.low) return LEVEL_LABELS.low;
     if (ratio < RELATIVE_THRESHOLDS.mid) return LEVEL_LABELS.mid;
     if (ratio < RELATIVE_THRESHOLDS.high) return LEVEL_LABELS.high;
-    return LEVEL_LABELS.veryHigh;
+    if (ratio < RELATIVE_THRESHOLDS.midHigh) return LEVEL_LABELS.midHigh;
+    if (ratio < RELATIVE_THRESHOLDS.upMidleHigh)
+        return LEVEL_LABELS.upMidleHigh;
+    if (ratio < RELATIVE_THRESHOLDS.veryHigh) return LEVEL_LABELS.veryHigh;
+    return LEVEL_LABELS.extreme;
 }
 
 /**

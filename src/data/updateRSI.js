@@ -46,7 +46,6 @@ async function updateRSIfromCache(interval, concurrency = 12) {
 
         let updatedCount = 0;
         let skippedCount = 0;
-        let adx = null;
         const errors = [];
 
         await asyncPool(concurrency, contracts, async (contract) => {
@@ -62,6 +61,12 @@ async function updateRSIfromCache(interval, concurrency = 12) {
                     400
                 );
 
+                if (!candles || candles.length < 30) {
+                    skippedCount++;
+                    return;
+                }
+
+                let adx = null;
                 const adxData = calcADX(candles);
                 if (adxData) {
                     adx = adxData.adx;
@@ -71,21 +76,12 @@ async function updateRSIfromCache(interval, concurrency = 12) {
                     });
                 }
 
-                if (!candles || candles.length < 30) {
-                    skippedCount++;
-                    return;
-                }
-
                 const [volatilityData, rsiValue] = await Promise.all([
                     getVolatilityLevel(candles, interval),
                     getRsi(candles),
                 ]);
 
-                if (
-                    rsiValue != null &&
-                    volatilityData != null &&
-                    volatilityData.volatilityPercent > 0.3
-                ) {
+                if (rsiValue != null && volatilityData != null) {
                     rsiCache.set(
                         symbol,
                         interval,

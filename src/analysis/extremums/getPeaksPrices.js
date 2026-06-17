@@ -17,6 +17,11 @@ const TRIM_MAP = Object.fromEntries(
 );
 
 async function getPeaksPriceContracts(symbol, interval) {
+    const volPrecentData = rsiCache.get(symbol, interval);
+    const volPrecent = volPrecentData.volPrecent;
+    if (interval === '1' && volPrecent <= 0.15) {
+        return [];
+    }
     const atr = rsiCache.get(symbol, interval)?.atr || 0;
 
     const ohlcData = await dbService.getCandles(
@@ -40,10 +45,12 @@ async function getPeaksPriceContracts(symbol, interval) {
             price: p.highPrice,
             date: p.dateTime,
             index: p.index,
+            rsi: p.rsi,
+            prominance: p.prominance,
         }))
     );
 
-    const filteredPeaks = await clusterMaxima(peaks);
+    const filteredPeaks = clusterMaxima(peaks);
 
     logger.debug(
         `[${symbol} ${interval}m] after clusterMaxima: ${filteredPeaks.length} extrema`,
@@ -51,10 +58,12 @@ async function getPeaksPriceContracts(symbol, interval) {
             price: p.highPrice,
             date: p.dateTime,
             index: p.index,
+            rsi: p.rsi,
+            prominance: p.prominance,
         }))
     );
 
-    return filteredPeaks;
+    return peaks;
 }
 
 module.exports = { getPeaksPriceContracts };
