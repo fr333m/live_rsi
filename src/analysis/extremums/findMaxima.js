@@ -15,15 +15,15 @@ const FRACTAL_BARS = {
 
 const promLevel = {
     1: 5,
-    5: 2,
-    15: 2,
-    60: 2,
+    5: 4,
+    15: 4,
+    60: 4,
 };
 
 function isFractalHigh(candles, i, timeframe) {
-    const high = candles[i].high;
+    const close = candles[i].close;
     for (let j = 1; j <= FRACTAL_BARS[timeframe]; j++) {
-        if (candles[i - j].high >= high || candles[i + j].high >= high)
+        if (candles[i - j].close >= close || candles[i + j].close >= close)
             return false;
     }
     return true;
@@ -64,7 +64,7 @@ async function findMaxima(candles, symbol, trimCount, atr = 0, timeframe) {
 
         allLocalMaxs.push({
             ...candle,
-            highPrice: candle.high,
+            highPrice: candle.close,
             closePrice: candle.close,
             dateTime: formatShort(candle.timestamp),
             timestamp: candle.timestamp,

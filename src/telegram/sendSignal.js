@@ -64,7 +64,7 @@ async function sendSignal(
     flowSignal = null,
     rsiLevel = null,
     macd15Value = null,
-    prominance
+    prominance = null
 ) {
     const extraDataByTf = null; // --- IGNORE --- пока не используем, но оставляем возможность
     logger.info(

@@ -76,6 +76,22 @@ async function findSignal(symbol, interval) {
 
             if (priceDiffPercent > volatility) return false;
 
+            if (type === 'peak' && interval === '1' && rsiValue.rsi <= 60) {
+                return false;
+            }
+
+            if (type === 'minimum' && interval === '1' && rsiValue.rsi >= 40) {
+                return false;
+            }
+
+            if (type === 'peak' && rsiValue.rsi < 55) {
+                return;
+            }
+
+            if (type === 'minimum' && rsiValue.rsi > 40) {
+                return;
+            }
+
             // Подтверждение через стакан + CVD (мягкое: не блокирует, только усиливает)
             const tol = lastprice * (rsiValue.volPrecent / 100);
             const flowData = marketFlowCache.get(symbol);

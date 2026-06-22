@@ -1,42 +1,42 @@
 // prominence.js
-// Для впадин: барьер — самый высокий high до более глубокого low с каждой стороны.
+// Для впадин: барьер — самый высокий close до более глубокого close с каждой стороны.
 async function computeTroughProminence(candles) {
     const n = candles.length;
     const prom = new Array(n).fill(0);
     for (let i = 0; i < n; i++) {
-        const L = candles[i].low;
-        let leftPeak = L;
+        const C = candles[i].close;
+        let leftPeak = C;
         for (let j = i - 1; j >= 0; j--) {
-            if (candles[j].low < L) break; // дошли до более глубокого low
-            if (candles[j].high > leftPeak) leftPeak = candles[j].high;
+            if (candles[j].close < C) break;
+            if (candles[j].close > leftPeak) leftPeak = candles[j].close;
         }
-        let rightPeak = L;
+        let rightPeak = C;
         for (let j = i + 1; j < n; j++) {
-            if (candles[j].low < L) break;
-            if (candles[j].high > rightPeak) rightPeak = candles[j].high;
+            if (candles[j].close < C) break;
+            if (candles[j].close > rightPeak) rightPeak = candles[j].close;
         }
-        prom[i] = Math.min(leftPeak, rightPeak) - L; // 0 для не-впадин
+        prom[i] = Math.min(leftPeak, rightPeak) - C;
     }
     return prom;
 }
 
-// Для пиков: зеркало — барьер это самый низкий low до более высокого high.
+// Для пиков: барьер — самый низкий close до более высокого close с каждой стороны.
 async function computePeakProminence(candles) {
     const n = candles.length;
     const prom = new Array(n).fill(0);
     for (let i = 0; i < n; i++) {
-        const H = candles[i].high;
-        let leftValley = H;
+        const C = candles[i].close;
+        let leftValley = C;
         for (let j = i - 1; j >= 0; j--) {
-            if (candles[j].high > H) break;
-            if (candles[j].low < leftValley) leftValley = candles[j].low;
+            if (candles[j].close > C) break;
+            if (candles[j].close < leftValley) leftValley = candles[j].close;
         }
-        let rightValley = H;
+        let rightValley = C;
         for (let j = i + 1; j < n; j++) {
-            if (candles[j].high > H) break;
-            if (candles[j].low < rightValley) rightValley = candles[j].low;
+            if (candles[j].close > C) break;
+            if (candles[j].close < rightValley) rightValley = candles[j].close;
         }
-        prom[i] = H - Math.max(leftValley, rightValley);
+        prom[i] = C - Math.max(leftValley, rightValley);
     }
     return prom;
 }

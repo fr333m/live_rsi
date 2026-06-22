@@ -16,15 +16,15 @@ const FRACTAL_BARS = {
 
 const promLevel = {
     1: 5,
-    5: 2,
-    15: 2,
-    60: 2,
+    5: 4,
+    15: 4,
+    60: 4,
 };
 
 function isFractalLow(candles, i, timeframe) {
-    const low = candles[i].low;
+    const close = candles[i].close;
     for (let j = 1; j <= FRACTAL_BARS[timeframe]; j++) {
-        if (candles[i - j].low <= low || candles[i + j].low <= low)
+        if (candles[i - j].close <= close || candles[i + j].close <= close)
             return false;
     }
     return true;
@@ -65,7 +65,7 @@ async function findMinima(candles, symbol, trimCount, atr = 0, timeframe) {
 
         allLocalMins.push({
             ...candle,
-            lowPrice: candle.low,
+            lowPrice: candle.close,
             closePrice: candle.close,
             dateTime: formatShort(candle.timestamp),
             timestamp: candle.timestamp,

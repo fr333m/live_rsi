@@ -1,6 +1,7 @@
 const dbService = require('../db/index');
 const { updateOHLC } = require('../data/updateOHLC');
 const { aggregateLastCandle } = require('../data/aggregateOHLC');
+const { runSearchHummerForInterval } = require('../signals/runSearchhummer');
 const { updateRSIfromCache } = require('../data/updateRSI');
 const {
     runUpdateExtremum_for_1m,
@@ -76,6 +77,7 @@ function startAlignedScheduler() {
                         }
                         await runUpdateExtremum_for_5m();
                         await updateRSIfromCache('5');
+                        await runSearchHummerForInterval('5');
                     }
                 });
             }
@@ -90,6 +92,7 @@ function startAlignedScheduler() {
                         }
                         await runUpdateExtremum_for_15m();
                         await updateRSIfromCache('15');
+                        await runSearchHummerForInterval('15');
                     }
                 });
             }
@@ -104,6 +107,7 @@ function startAlignedScheduler() {
                         }
                         await runUpdateExtremum_for_60m();
                         await updateRSIfromCache('60');
+                        await runSearchHummerForInterval('60');
                     }
                 });
             }
